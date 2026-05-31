@@ -1,0 +1,131 @@
+#pragma once
+
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_gui_extra/juce_gui_extra.h>
+
+#include <array>
+
+#include "PluginProcessor.h"
+#include "UI/MorphiumLookAndFeel.h"
+
+namespace morphium
+{
+    /**
+        A SOURCE selector button. The panel SVG already draws the button body
+        and its label, so this only renders interactive state: a selection
+        outline and the red LED, matching the original artwork.
+    */
+    class SourceButton : public juce::Button
+    {
+    public:
+        SourceButton() : juce::Button ({}) {}
+
+        void setSelectedState (bool shouldBeSelected)
+        {
+            if (selected != shouldBeSelected) { selected = shouldBeSelected; repaint(); }
+        }
+
+        void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+
+    private:
+        bool selected = false;
+    };
+
+    /**
+        The LED preset display. Shows the current factory preset; clicking the
+        left half steps to the previous preset, the right half to the next.
+    */
+    class PresetDisplay : public juce::Component
+    {
+    public:
+        std::function<void (int)> onStep;   // -1 = previous, +1 = next
+
+        void setContent (int index, const juce::String& name);
+        void paint (juce::Graphics&) override;
+        void mouseDown (const juce::MouseEvent&) override;
+        void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+        void mouseExit  (const juce::MouseEvent&) override { repaint(); }
+
+    private:
+        int presetIndex = 0;
+        juce::String presetName;
+    };
+
+    /**
+        A small animated oscilloscope. It draws a stylised waveform that is
+        characteristic of the currently selected excitation source, scrolling
+        gently so it reads as "alive" rather than a static picture.
+    */
+    class WaveDisplay : public juce::Component
+    {
+    public:
+        void setSource (std::atomic<float>* parameter) { excitationParam = parameter; }
+        void setPhase (float newPhase) { phase = newPhase; repaint(); }
+        void paint (juce::Graphics&) override;
+
+    private:
+        std::atomic<float>* excitationParam = nullptr;
+        float phase = 0.0f;
+    };
+
+    /**
+        The "Borato Macro" hero knob. Custom-drawn: a thick gold value ring with
+        a glow over a dark track, a metal body with a bold pointer, and A / B / C
+        markers that brighten near the current morph zone.
+    */
+    class MacroKnob : public juce::Slider
+    {
+    public:
+        MacroKnob() : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag,
+                                    juce::Slider::NoTextBox) {}
+        void paint (juce::Graphics&) override;
+    };
+
+    class MorphiumAudioProcessorEditor : public juce::AudioProcessorEditor,
+                                         private juce::Timer
+    {
+    public:
+        explicit MorphiumAudioProcessorEditor (MorphiumAudioProcessor&);
+        ~MorphiumAudioProcessorEditor() override;
+
+        void paint (juce::Graphics&) override;
+        void resized() override;
+
+    private:
+        using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+
+        // Helper: lay out a control in original SVG (1280x760) coordinates.
+        juce::Rectangle<int> svg (float x, float y, float w, float h) const;
+
+        void configureRotary (juce::Slider&);
+        void configureVertical (juce::Slider&);
+
+        void timerCallback() override;
+        void stepPreset (int direction);
+        void refreshPresetDisplay();
+
+        MorphiumAudioProcessor& processorRef;
+        MorphiumLookAndFeel lookAndFeel;
+
+        std::unique_ptr<juce::Drawable> panel;   // SVG background
+
+        PresetDisplay presetDisplay;
+        WaveDisplay waveDisplay;
+        float wavePhase = 0.0f;
+
+        static constexpr int numSources = 6;
+        std::array<SourceButton, numSources> sourceButtons;
+        std::unique_ptr<juce::ParameterAttachment> excitationAttachment;
+
+        juce::Slider densitySlider, massSlider, frictionSlider, wearSlider;
+        juce::Slider attackSlider, decaySlider, sustainSlider, releaseSlider;
+        juce::Slider outputSlider;
+        MacroKnob    macroSlider;                // "Borato Macro": morph engine
+
+        std::unique_ptr<SliderAttachment> densityAtt, massAtt, frictionAtt, wearAtt;
+        std::unique_ptr<SliderAttachment> attackAtt, decayAtt, sustainAtt, releaseAtt;
+        std::unique_ptr<SliderAttachment> outputAtt;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MorphiumAudioProcessorEditor)
+    };
+}
