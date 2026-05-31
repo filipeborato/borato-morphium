@@ -14,7 +14,7 @@ namespace
     constexpr float kAspectRatio  = kSvgWidth / kSvgHeight;
     constexpr float kInitialScale = 0.85f;
     constexpr float kMinScale     = 0.55f;
-    constexpr float kMaxScale     = 1.30f;
+    constexpr float kMaxScale     = 3.00f;
 
     // Three curated "matter states" the Borato Macro morphs through.
     struct MatterState { float density, mass, friction, wear; };
