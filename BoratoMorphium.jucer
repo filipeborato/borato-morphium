@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="Mphm" name="BoratoMorphium" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Borato Company"
-              companyWebsite="borato.audio" version="0.1.0" cppLanguageStandard="20"
+              companyWebsite="borato.audio" version="0.2.0" cppLanguageStandard="20"
               bundleIdentifier="com.boratoaudio.morphium" pluginName="Borato Morphium"
               pluginDesc="Sound Matter Synthesizer" pluginManufacturer="Borato Company"
               pluginManufacturerCode="Bora" pluginCode="Mph1" pluginChannelConfigs="{0,2}"

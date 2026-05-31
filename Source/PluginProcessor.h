@@ -4,6 +4,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include "Core/MorphiumVoice.h"
+#include "Core/PresetManager.h"
 
 namespace morphium
 {
@@ -38,6 +39,7 @@ namespace morphium
         void setStateInformation (const void* data, int sizeInBytes) override;
 
         juce::AudioProcessorValueTreeState& getValueTreeState() { return apvts; }
+        morphium::PresetManager presetManager;
 
     private:
         static constexpr int numVoices = 8;
@@ -48,6 +50,10 @@ namespace morphium
 
         juce::SmoothedValue<float> outputGain;
         std::atomic<float>* outputGainParam = nullptr;
+        std::atomic<float>* reverbSizeParam = nullptr;
+        std::atomic<float>* reverbMixParam  = nullptr;
+
+        juce::dsp::Reverb reverb;
 
         int currentProgram = 0;
 

@@ -91,6 +91,68 @@ namespace
     }
 }
 
+void MorphiumAudioProcessorEditor::applyMacro (float amount, int mode)
+{
+    auto set = [this] (const char* id, float value)
+    {
+        if (auto* p = processorRef.getValueTreeState().getParameter (id))
+            p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, value));
+    };
+
+    switch (mode)
+    {
+        case 0: // MATTER (Air -> Wood -> Metal)
+        {
+            auto state = morphMatter (amount);
+            set (params::density, state.density);
+            set (params::mass, state.mass);
+            set (params::friction, state.friction);
+            set (params::wear, state.wear);
+            break;
+        }
+        case 1: // SPACE (Dry -> Massive)
+            set (params::reverbSize, 0.4f + amount * 0.6f);
+            set (params::reverbMix, 0.1f + amount * 0.8f);
+            set (params::lfoRate, 0.2f + amount * 0.5f);
+            set (params::release, 0.3f + amount * 0.7f);
+            break;
+        case 2: // PUNCH (Pad -> Pluck)
+            set (params::attack, 0.5f * (1.0f - amount));
+            set (params::sustain, 1.0f - amount);
+            set (params::density, 0.2f + amount * 0.8f);
+            break;
+        case 3: // CHAOS (Clean -> Broken)
+            set (params::wear, amount);
+            set (params::friction, amount);
+            set (params::lfoDepth, amount);
+            set (params::lfoRate, 0.1f + amount * 0.9f);
+            break;
+        case 4: // FREEZE (Percussive -> Drone)
+            set (params::decay, 0.1f + amount * 0.9f);
+            set (params::sustain, amount);
+            set (params::reverbMix, 0.2f + amount * 0.6f);
+            set (params::attack, 0.05f + amount * 0.5f);
+            break;
+        case 5: // PULSAR (Static -> Rhythmic)
+            set (params::lfoRate, 0.5f + amount * 0.5f);
+            set (params::lfoDepth, amount);
+            set (params::wear, amount * 0.8f);
+            break;
+        case 6: // LOFI (Full -> Thin/Dusty)
+            set (params::density, 1.0f - amount);
+            set (params::mass, 1.0f - amount * 0.8f);
+            set (params::wear, amount);
+            set (params::friction, amount * 0.5f);
+            break;
+        case 7: // RESONANCE (Damped -> Pure Ring)
+            set (params::friction, 0.5f * (1.0f - amount));
+            set (params::mass, 0.2f + amount * 0.8f);
+            set (params::density, 0.5f + amount * 0.5f);
+            set (params::reverbSize, 0.5f * (1.0f - amount));
+            break;
+    }
+}
+
 void WaveDisplay::paint (juce::Graphics& g)
 {
     const auto area = getLocalBounds().toFloat().reduced (getWidth() * 0.03f, getHeight() * 0.12f);
@@ -111,7 +173,7 @@ void WaveDisplay::paint (juce::Graphics& g)
         else        path.lineTo (px, py);
     }
 
-    const juce::Colour trace { 0xff78ffca };
+    const juce::Colour trace { 0xff00f0ff };
     const float lineW = juce::jmax (1.5f, getHeight() * 0.03f);
     g.setColour (trace.withAlpha (0.22f));
     g.strokePath (path, juce::PathStrokeType (lineW * 2.4f, juce::PathStrokeType::curved));
@@ -206,8 +268,21 @@ void PresetDisplay::setContent (int index, const juce::String& name)
 
 void PresetDisplay::mouseDown (const juce::MouseEvent& e)
 {
-    if (onStep != nullptr)
-        onStep (e.position.x < getWidth() * 0.5f ? -1 : +1);
+    // If there is an onClick handler (like the main preset menu), it owns the center 60%
+    if (onClick && e.position.x > getWidth() * 0.2f && e.position.x < getWidth() * 0.8f)
+    {
+        onClick();
+        return;
+    }
+
+    // If there is an onStep handler, left half goes back, right half goes forward
+    if (onStep)
+    {
+        if (e.position.x < getWidth() * 0.5f)
+            onStep (-1);
+        else
+            onStep (+1);
+    }
 }
 
 void PresetDisplay::paint (juce::Graphics& g)
@@ -215,7 +290,7 @@ void PresetDisplay::paint (juce::Graphics& g)
     const float h = (float) getHeight();
     const float w = (float) getWidth();
     auto bounds = getLocalBounds().toFloat().reduced (w * 0.05f, h * 0.14f);
-    const auto red = MorphiumLookAndFeel::ledRed;
+    const auto cyan = MorphiumLookAndFeel::ledCyan;
 
     auto drawLed = [&] (const juce::String& text, juce::Rectangle<float> area,
                         float height, juce::Justification just)
@@ -223,20 +298,27 @@ void PresetDisplay::paint (juce::Graphics& g)
         const juce::Font font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(),
                                                   height, juce::Font::bold));
         g.setFont (font);
-        g.setColour (red.withAlpha (0.25f));            // faint bloom
+        g.setColour (cyan.withAlpha (0.25f));            // faint bloom
         g.drawText (text, area.translated (0.0f, 0.5f), just, false);
-        g.setColour (red);
+        g.setColour (cyan);
         g.drawText (text, area, just, false);
     };
 
-    drawLed ("PRESET " + juce::String (presetIndex + 1).paddedLeft ('0', 2),
-             bounds.removeFromTop (h * 0.30f), h * 0.22f, juce::Justification::topLeft);
-    drawLed (presetName, bounds, h * 0.40f, juce::Justification::centredLeft);
+    if (presetIndex >= 0)
+    {
+        drawLed ("PRESET " + juce::String (presetIndex + 1).paddedLeft ('0', 2),
+                 bounds.removeFromTop (h * 0.30f), h * 0.22f, juce::Justification::topLeft);
+        drawLed (presetName, bounds, h * 0.40f, juce::Justification::centredLeft);
+    }
+    else
+    {
+        drawLed (presetName, bounds, h * 0.40f, juce::Justification::centred);
+    }
 
     // Clickable chevrons, brighter when the pointer is over the display.
     const bool over = isMouseOver();
     auto full = getLocalBounds().toFloat();
-    g.setColour (red.withAlpha (over ? 0.85f : 0.35f));
+    g.setColour (cyan.withAlpha (over ? 0.85f : 0.35f));
     g.setFont (juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(),
                                               h * 0.36f, juce::Font::bold)));
     g.drawText ("<", full.removeFromLeft (w * 0.05f),  juce::Justification::centred, false);
@@ -265,15 +347,37 @@ void SourceButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down
                                         bounds.getY() + bounds.getHeight() * 0.25f });
     if (selected)
     {
-        g.setColour (MorphiumLookAndFeel::ledRed.withAlpha (0.35f));
+        g.setColour (MorphiumLookAndFeel::ledCyan.withAlpha (0.35f));
         g.fillEllipse (led.expanded (ledSize * 0.45f));
-        g.setColour (MorphiumLookAndFeel::ledRed);
+        g.setColour (MorphiumLookAndFeel::ledCyan);
     }
     else
     {
         g.setColour (juce::Colour { 0xff3a2222 });
     }
     g.fillEllipse (led);
+}
+
+void ResonatorButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down*/)
+{
+    const auto bounds = getLocalBounds().toFloat();
+
+    if (selected)
+    {
+        // Glowing Neon pink border matching selection slot
+        g.setColour (MorphiumLookAndFeel::gold);
+        g.drawRoundedRectangle (bounds.reduced (1.0f), 4.0f, 1.8f);
+        
+        // Subtle pink fill background
+        g.setColour (MorphiumLookAndFeel::gold.withAlpha (0.10f));
+        g.fillRoundedRectangle (bounds.reduced (1.0f), 4.0f);
+    }
+    else if (highlighted)
+    {
+        // Cyber cyan hover feedback border
+        g.setColour (MorphiumLookAndFeel::pointer.withAlpha (0.5f));
+        g.drawRoundedRectangle (bounds.reduced (1.0f), 4.0f, 1.2f);
+    }
 }
 
 MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcessor& p)
@@ -286,6 +390,7 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
 
     // --- Preset display -----------------------------------------------------
     presetDisplay.onStep = [this] (int direction) { stepPreset (direction); };
+    presetDisplay.onClick = [this] () { showPresetMenu(); };
     addAndMakeVisible (presetDisplay);
     refreshPresetDisplay();
 
@@ -296,17 +401,29 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     addAndMakeVisible (waveDisplay);
     startTimerHz (30);  // animate the scope + keep the preset display in sync
 
-    // --- Excitation source (the six SOURCE buttons) -------------------------
+    // --- Excitation source (the six SOURCE category buttons) ----------------
+    const int categoryBases[] = {0, 3, 5, 7, 10, 11};
     for (int i = 0; i < numSources; ++i)
     {
         auto& button = sourceButtons[(size_t) i];
-        button.onClick = [this, i]
+        int baseIdx = categoryBases[i];
+        button.onClick = [this, baseIdx]
         {
             if (excitationAttachment != nullptr)
-                excitationAttachment->setValueAsCompleteGesture (static_cast<float> (i));
+                excitationAttachment->setValueAsCompleteGesture (static_cast<float> (baseIdx));
         };
         addAndMakeVisible (button);
     }
+    
+    // --- Excitation display (LED under the buttons) -------------------------
+    addAndMakeVisible(excitationDisplay);
+    excitationDisplay.onStep = [this] (int direction) {
+        if (auto* choiceParam = dynamic_cast<juce::AudioParameterChoice*>(processorRef.getValueTreeState().getParameter(params::excitationType))) {
+            int currentIdx = choiceParam->getIndex();
+            int newIdx = juce::jlimit(0, choiceParam->choices.size() - 1, currentIdx + direction);
+            choiceParam->operator=(newIdx);
+        }
+    };
 
     if (auto* excitationParam = apvts.getParameter (params::excitationType))
     {
@@ -314,9 +431,20 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
             *excitationParam,
             [this] (float value)
             {
-                const int index = juce::jlimit (0, numSources - 1, juce::roundToInt (value));
+                const int index = juce::roundToInt (value);
+                int category = 0;
+                if (index >= 11) category = 5;
+                else if (index >= 10) category = 4;
+                else if (index >= 7) category = 3;
+                else if (index >= 5) category = 2;
+                else if (index >= 3) category = 1;
+                else category = 0;
+
                 for (int i = 0; i < numSources; ++i)
-                    sourceButtons[(size_t) i].setSelectedState (i == index);
+                    sourceButtons[(size_t) i].setSelectedState (i == category);
+                    
+                juce::String name = morphium::getExcitationTypeNames()[index];
+                excitationDisplay.setContent(-1, "SRC: " + name);
             });
         excitationAttachment->sendInitialUpdate();
     }
@@ -330,40 +458,75 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     frictionAtt = std::make_unique<SliderAttachment> (apvts, params::friction, frictionSlider);
     wearAtt     = std::make_unique<SliderAttachment> (apvts, params::wear,     wearSlider);
 
-    // --- Envelope + output knobs -------------------------------------------
-    for (auto* s : { &attackSlider, &decaySlider, &sustainSlider, &releaseSlider, &outputSlider })
-        configureRotary (*s);
+    // --- Resonator buttons --------------------------------------------------
+    for (int i = 0; i < numResonatorModes; ++i)
+    {
+        auto& button = resonatorButtons[(size_t) i];
+        button.onClick = [this, i]
+        {
+            if (resonatorAttachment != nullptr)
+                resonatorAttachment->setValueAsCompleteGesture (static_cast<float> (i));
+        };
+        addAndMakeVisible (button);
+    }
 
-    attackAtt  = std::make_unique<SliderAttachment> (apvts, params::attack,     attackSlider);
-    decayAtt   = std::make_unique<SliderAttachment> (apvts, params::decay,      decaySlider);
-    sustainAtt = std::make_unique<SliderAttachment> (apvts, params::sustain,    sustainSlider);
-    releaseAtt = std::make_unique<SliderAttachment> (apvts, params::release,    releaseSlider);
-    outputAtt  = std::make_unique<SliderAttachment> (apvts, params::outputGain, outputSlider);
+    if (auto* resonatorParam = apvts.getParameter (params::resonatorMode))
+    {
+        resonatorAttachment = std::make_unique<juce::ParameterAttachment> (
+            *resonatorParam,
+            [this] (float value)
+            {
+                const int index = juce::jlimit (0, numResonatorModes - 1, juce::roundToInt (value));
+                for (int i = 0; i < numResonatorModes; ++i)
+                    resonatorButtons[(size_t) i].setSelectedState (i == index);
+            });
+        resonatorAttachment->sendInitialUpdate();
+    }
+
+    // --- Envelope + output knobs -------------------------------------------
+    for (auto* s : { &attackSlider, &decaySlider, &sustainSlider, &releaseSlider, &outputSlider,
+                     &lfoRateSlider, &lfoDepthSlider, &reverbSizeSlider, &reverbMixSlider })
+    {
+        configureRotary (*s);
+    }
+
+    attackAtt      = std::make_unique<SliderAttachment> (apvts, params::attack,     attackSlider);
+    decayAtt       = std::make_unique<SliderAttachment> (apvts, params::decay,      decaySlider);
+    sustainAtt     = std::make_unique<SliderAttachment> (apvts, params::sustain,    sustainSlider);
+    releaseAtt     = std::make_unique<SliderAttachment> (apvts, params::release,    releaseSlider);
+    lfoRateAtt     = std::make_unique<SliderAttachment> (apvts, params::lfoRate,    lfoRateSlider);
+    lfoDepthAtt    = std::make_unique<SliderAttachment> (apvts, params::lfoDepth,   lfoDepthSlider);
+    reverbSizeAtt  = std::make_unique<SliderAttachment> (apvts, params::reverbSize,  reverbSizeSlider);
+    reverbMixAtt   = std::make_unique<SliderAttachment> (apvts, params::reverbMix,   reverbMixSlider);
+    outputAtt      = std::make_unique<SliderAttachment> (apvts, params::outputGain, outputSlider);
 
     // --- Borato Macro -------------------------------------------------------
-    // Not bound to a single parameter: it drives Density + Wear together,
-    // a first taste of the morph engine. Future work moves this to a real
-    // macro/modulation matrix.
+    addAndMakeVisible (macroDisplay);
+    macroDisplay.onStep = [this] (int direction) {
+        if (auto* choiceParam = dynamic_cast<juce::AudioParameterChoice*>(processorRef.getValueTreeState().getParameter(params::macroMode))) {
+            int currentIdx = choiceParam->getIndex();
+            int newIdx = juce::jlimit(0, choiceParam->choices.size() - 1, currentIdx + direction);
+            choiceParam->operator=(newIdx);
+        }
+    };
+
+    if (auto* modeParam = apvts.getParameter(params::macroMode)) {
+        macroModeAtt = std::make_unique<juce::ParameterAttachment>(*modeParam, [this](float value) {
+            int index = juce::roundToInt(value);
+            auto choices = dynamic_cast<juce::AudioParameterChoice*>(processorRef.getValueTreeState().getParameter(params::macroMode))->choices;
+            macroDisplay.setContent(-1, "MODE: " + choices[index]);
+            applyMacro (macroSlider.getValue(), index);
+        });
+        macroModeAtt->sendInitialUpdate();
+    }
+
     configureRotary (macroSlider);
-    macroSlider.setRange (0.0, 1.0, 0.0);
-    macroSlider.setValue (0.5, juce::dontSendNotification);
+    macroAtt = std::make_unique<SliderAttachment> (apvts, params::macroAmount, macroSlider);
     macroSlider.onValueChange = [this]
     {
-        // Morph the whole "matter" character through three curated states:
-        //   A (air / glass) -> B (body / wood) -> C (mass / metal),
-        // eased per segment so the centre lands exactly on the B sweet spot.
-        const auto state = morphMatter (static_cast<float> (macroSlider.getValue()));
-
-        auto set = [this] (const char* id, float value)
-        {
-            if (auto* p = processorRef.getValueTreeState().getParameter (id))
-                p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, value));
-        };
-
-        set (params::density,  state.density);
-        set (params::mass,     state.mass);
-        set (params::friction, state.friction);
-        set (params::wear,     state.wear);
+        if (auto* choiceParam = dynamic_cast<juce::AudioParameterChoice*>(processorRef.getValueTreeState().getParameter(params::macroMode))) {
+            applyMacro (macroSlider.getValue(), choiceParam->getIndex());
+        }
     };
 
     // Resizable, with the panel's aspect ratio locked so nothing distorts.
@@ -410,8 +573,76 @@ void MorphiumAudioProcessorEditor::stepPreset (int direction)
 
 void MorphiumAudioProcessorEditor::refreshPresetDisplay()
 {
-    const int index = processorRef.getCurrentProgram();
-    presetDisplay.setContent (index, processorRef.getProgramName (index));
+    int index = processorRef.presetManager.currentFactoryIndex;
+    juce::String name = processorRef.presetManager.getCurrentPresetName();
+    presetDisplay.setContent (index, name);
+}
+
+void MorphiumAudioProcessorEditor::showPresetMenu()
+{
+    juce::PopupMenu menu;
+    
+    // Factory presets
+    juce::PopupMenu factoryMenu;
+    const auto& factories = getFactoryPresets();
+    for (int i = 0; i < (int)factories.size(); ++i)
+    {
+        factoryMenu.addItem(i + 1, factories[(size_t)i].name, true, processorRef.presetManager.currentFactoryIndex == i);
+    }
+    menu.addSubMenu("Factory Presets", factoryMenu);
+    
+    menu.addSeparator();
+    
+    // User presets
+    juce::PopupMenu userMenu;
+    auto userPresets = processorRef.presetManager.getUserPresets();
+    for (int i = 0; i < userPresets.size(); ++i)
+    {
+        userMenu.addItem(1000 + i, userPresets[i], true, processorRef.presetManager.currentUserPresetName == userPresets[i]);
+    }
+    menu.addSubMenu("User Presets", userMenu);
+    
+    menu.addSeparator();
+    menu.addItem(2000, "Save Preset As...");
+
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&presetDisplay),
+                       [this, userPresets] (int result)
+    {
+        if (result == 0) return;
+        
+        if (result >= 1 && result < 1000)
+        {
+            processorRef.presetManager.loadFactoryPreset(result - 1);
+            refreshPresetDisplay();
+        }
+        else if (result >= 1000 && result < 2000)
+        {
+            processorRef.presetManager.loadUserPreset(userPresets[result - 1000]);
+            refreshPresetDisplay();
+        }
+        else if (result == 2000)
+        {
+            auto* aw = new juce::AlertWindow("Save Preset", "Enter a name for your preset:", juce::MessageBoxIconType::NoIcon);
+            aw->addTextEditor("presetName", processorRef.presetManager.getCurrentPresetName(), "");
+            aw->addButton("Save", 1, juce::KeyPress(juce::KeyPress::returnKey, 0, 0));
+            aw->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey, 0, 0));
+            
+            aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                [this, aw] (int r)
+                {
+                    if (r == 1)
+                    {
+                        juce::String name = aw->getTextEditorContents("presetName");
+                        if (name.isNotEmpty())
+                        {
+                            processorRef.presetManager.saveUserPreset(name);
+                            refreshPresetDisplay();
+                        }
+                    }
+                    delete aw;
+                }));
+        }
+    });
 }
 
 juce::Rectangle<int> MorphiumAudioProcessorEditor::svg (float x, float y, float w, float h) const
@@ -465,24 +696,41 @@ void MorphiumAudioProcessorEditor::resized()
         sourceButtons[(size_t) i].setBounds (svg (885.0f + col * 88.0f,
                                                   215.0f + row * 48.0f, 78.0f, 36.0f));
     }
+    
+    // LED under the source buttons. SVG: transform="translate(885 311)" size 254x26
+    excitationDisplay.setBounds (svg (885, 311, 254, 26));
 
-    // MATTER faders: base (465,450), 44 wide, 64 apart, 150 tall.
-    densitySlider.setBounds  (svg (465, 450, 44, 150));
-    massSlider.setBounds     (svg (529, 450, 44, 150));
-    frictionSlider.setBounds (svg (593, 450, 44, 150));
-    wearSlider.setBounds     (svg (657, 450, 44, 150));
+    // MATTER faders: base (395,450), 44 wide, 64 apart, 150 tall.
+    densitySlider.setBounds  (svg (395, 450, 44, 150));
+    massSlider.setBounds     (svg (459, 450, 44, 150));
+    frictionSlider.setBounds (svg (523, 450, 44, 150));
+    wearSlider.setBounds     (svg (587, 450, 44, 150));
 
-    // CORE knobs -> A / D / S (centres 180/280/380, y 490, r ~43).
-    attackSlider.setBounds  (svg (137, 447, 86, 86));
-    decaySlider.setBounds   (svg (237, 447, 86, 86));
-    sustainSlider.setBounds (svg (337, 447, 86, 86));
+    // MACRO
+    macroSlider.setBounds  (svg (675, 430, 180, 180));
+    macroDisplay.setBounds (svg (715, 635, 120, 22));
 
-    // MOTION/SPACE knobs -> Release / Output (centres 1005/1100, y 487).
-    releaseSlider.setBounds (svg (967, 449, 76, 76));
-    outputSlider.setBounds  (svg (1062, 449, 76, 76));
+    // RESONATOR Model buttons: positioned exactly above faders.
+    for (int i = 0; i < numResonatorModes; ++i)
+    {
+        resonatorButtons[(size_t) i].setBounds (svg (391.0f + (float) i * 64.0f, 430.0f, 52.0f, 20.0f));
+    }
 
-    // BORATO MACRO: the hero control. The bounds include an outer margin for
-    // the A/B/C labels; the visible knob fills ~72% of it. Centred at (830,538).
-    macroSlider.setBounds (svg (722, 430, 216, 216));
+    // CORE knobs -> A / D / S
+    attackSlider.setBounds  (svg (97, 447, 86, 86));
+    decaySlider.setBounds   (svg (182, 447, 86, 86));
+    sustainSlider.setBounds (svg (267, 447, 86, 86));
+
+    // MOTION/SPACE knobs -> 3 columns x 2 rows grid.
+    lfoRateSlider.setBounds    (svg (910, 420, 60, 60));
+    reverbSizeSlider.setBounds (svg (990, 420, 60, 60));
+    releaseSlider.setBounds    (svg (1070, 420, 60, 60));
+    
+    lfoDepthSlider.setBounds   (svg (910, 510, 60, 60));
+    reverbMixSlider.setBounds  (svg (990, 510, 60, 60));
+    outputSlider.setBounds     (svg (1070, 510, 60, 60));
+
+    // BORATO MACRO: the hero control. Centred at (775,538).
+    macroSlider.setBounds (svg (667, 430, 216, 216));
 }
 }

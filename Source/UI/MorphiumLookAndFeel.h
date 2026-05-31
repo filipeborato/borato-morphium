@@ -26,6 +26,6 @@ namespace morphium
                                juce::Slider::SliderStyle, juce::Slider&) override;
 
         // Palette shared with the SVG panel.
-        static const juce::Colour metalLight, metalDark, gold, pointer, slotDark, ledRed;
+        static const juce::Colour metalLight, metalDark, gold, pointer, slotDark, ledCyan;
     };
 }

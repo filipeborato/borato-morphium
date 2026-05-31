@@ -23,11 +23,14 @@ namespace morphium
         std::atomic<float>* decay          = nullptr;
         std::atomic<float>* sustain        = nullptr;
         std::atomic<float>* release        = nullptr;
+        std::atomic<float>* lfoRate        = nullptr;
+        std::atomic<float>* lfoDepth       = nullptr;
+        std::atomic<float>* resonatorMode  = nullptr;
     };
 
     /**
         One polyphonic voice:
-            note -> ExcitationCore -> BasicMatterProcessor -> ADSR -> mix
+            note -> ExcitationCore -> BasicMatterProcessor (with Resonator) -> ADSR -> mix
     */
     class MorphiumVoice : public juce::SynthesiserVoice
     {
@@ -60,5 +63,8 @@ namespace morphium
 
         juce::SmoothedValue<float> level;   // velocity, smoothed to avoid clicks
         bool isPrepared = false;
+
+        float lfoPhase = 0.0f;
+        float currentFrequency = 440.0f;
     };
 }

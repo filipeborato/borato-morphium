@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(BoratoMorphium VERSION 0.1.0 LANGUAGES C CXX)
+project(BoratoMorphium VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -106,6 +106,8 @@ target_sources(BoratoMorphium
         Source/Parameters/ParameterIDs.h
         Source/Parameters/ParameterLayout.cpp
         Source/Parameters/ParameterLayout.h
+        Source/Core/PresetManager.cpp
+        Source/Core/PresetManager.h
         Source/Core/MorphiumSound.h
         Source/Core/MorphiumVoice.cpp
         Source/Core/MorphiumVoice.h

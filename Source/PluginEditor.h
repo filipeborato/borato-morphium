@@ -32,6 +32,26 @@ namespace morphium
     };
 
     /**
+        A RESONATOR model selector button. Draws a clean glowing outrun pink border
+        when selected and cyber cian on hover, fitting the background slots.
+    */
+    class ResonatorButton : public juce::Button
+    {
+    public:
+        ResonatorButton() : juce::Button ({}) {}
+
+        void setSelectedState (bool shouldBeSelected)
+        {
+            if (selected != shouldBeSelected) { selected = shouldBeSelected; repaint(); }
+        }
+
+        void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+
+    private:
+        bool selected = false;
+    };
+
+    /**
         The LED preset display. Shows the current factory preset; clicking the
         left half steps to the previous preset, the right half to the next.
     */
@@ -39,6 +59,7 @@ namespace morphium
     {
     public:
         std::function<void (int)> onStep;   // -1 = previous, +1 = next
+        std::function<void()> onClick;
 
         void setContent (int index, const juce::String& name);
         void paint (juce::Graphics&) override;
@@ -103,6 +124,8 @@ namespace morphium
         void timerCallback() override;
         void stepPreset (int direction);
         void refreshPresetDisplay();
+        void showPresetMenu();
+        void applyMacro (float amount, int mode);
 
         MorphiumAudioProcessor& processorRef;
         MorphiumLookAndFeel lookAndFeel;
@@ -117,14 +140,32 @@ namespace morphium
         std::array<SourceButton, numSources> sourceButtons;
         std::unique_ptr<juce::ParameterAttachment> excitationAttachment;
 
+        static constexpr int numResonatorModes = 4;
+        std::array<ResonatorButton, numResonatorModes> resonatorButtons;
+        std::unique_ptr<juce::ParameterAttachment> resonatorAttachment;
+
+        juce::AudioProcessorValueTreeState::ButtonAttachment* getResonatorAttachment (size_t index);
+
+        PresetDisplay excitationDisplay;
+        PresetDisplay macroDisplay;
+
         juce::Slider densitySlider, massSlider, frictionSlider, wearSlider;
         juce::Slider attackSlider, decaySlider, sustainSlider, releaseSlider;
+        
+        juce::Slider lfoRateSlider, lfoDepthSlider;
+        juce::Slider reverbSizeSlider, reverbMixSlider;
+        
         juce::Slider outputSlider;
         MacroKnob    macroSlider;                // "Borato Macro": morph engine
 
         std::unique_ptr<SliderAttachment> densityAtt, massAtt, frictionAtt, wearAtt;
         std::unique_ptr<SliderAttachment> attackAtt, decayAtt, sustainAtt, releaseAtt;
+        std::unique_ptr<SliderAttachment> lfoRateAtt, lfoDepthAtt;
+        std::unique_ptr<SliderAttachment> reverbSizeAtt, reverbMixAtt;
         std::unique_ptr<SliderAttachment> outputAtt;
+        
+        std::unique_ptr<SliderAttachment> macroAtt;
+        std::unique_ptr<juce::ParameterAttachment> macroModeAtt;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MorphiumAudioProcessorEditor)
     };
