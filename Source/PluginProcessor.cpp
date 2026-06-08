@@ -22,6 +22,7 @@ MorphiumAudioProcessor::MorphiumAudioProcessor()
     outputGainParam = apvts.getRawParameterValue (params::outputGain);
     reverbSizeParam = apvts.getRawParameterValue (params::reverbSize);
     reverbMixParam  = apvts.getRawParameterValue (params::reverbMix);
+    driveParam      = apvts.getRawParameterValue (params::drive);
 }
 
 void MorphiumAudioProcessor::wireVoiceParameters()
@@ -92,13 +93,21 @@ void MorphiumAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     const int numSamples  = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
 
+    float driveAmt = driveParam != nullptr ? driveParam->load() : 0.0f;
+    float preGain = 1.0f + driveAmt * 10.0f;
+    float postGain = 1.0f / (1.0f + driveAmt * 2.0f);
+
     for (int sample = 0; sample < numSamples; ++sample)
     {
         const float gain = outputGain.getNextValue();
         for (int channel = 0; channel < numChannels; ++channel)
         {
             float s = buffer.getSample (channel, sample) * gain;
-            s = std::tanh (s); // Analog-style soft clipper to prevent absurd peaks
+            
+            // Soft clipping drive
+            if (driveAmt > 0.01f)
+                s = std::tanh (s * preGain) * postGain;
+
             buffer.setSample (channel, sample, s);
         }
     }

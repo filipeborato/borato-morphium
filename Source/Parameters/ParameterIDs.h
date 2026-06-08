@@ -29,9 +29,10 @@ namespace morphium::params
     inline constexpr auto lfoRate  = "lfoRate";
     inline constexpr auto lfoDepth = "lfoDepth";
 
-    // Space (Reverb)
+    // Space (Reverb & Color)
     inline constexpr auto reverbSize = "reverbSize";
     inline constexpr auto reverbMix  = "reverbMix";
+    inline constexpr auto drive      = "drive";
 
     // Matter Resonator Model
     inline constexpr auto resonatorMode = "resonatorMode";

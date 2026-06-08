@@ -52,6 +52,7 @@ namespace morphium
         std::atomic<float>* outputGainParam = nullptr;
         std::atomic<float>* reverbSizeParam = nullptr;
         std::atomic<float>* reverbMixParam  = nullptr;
+        std::atomic<float>* driveParam      = nullptr;
 
         juce::dsp::Reverb reverb;
 

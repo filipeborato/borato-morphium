@@ -61,9 +61,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     layout.add (std::make_unique<APF> (makeID (params::lfoRate), "LFO Rate", rateRange, 1.0f, Attr().withLabel ("Hz")));
     layout.add (std::make_unique<APF> (makeID (params::lfoDepth), "LFO Depth", unit, 0.20f));
 
-    // --- Space (Reverb) -----------------------------------------------------
+    // --- Space & Color (Reverb, Drive) --------------------------------------
     layout.add (std::make_unique<APF> (makeID (params::reverbSize), "Reverb Size", unit, 0.60f));
     layout.add (std::make_unique<APF> (makeID (params::reverbMix), "Reverb Mix", unit, 0.25f));
+    layout.add (std::make_unique<APF> (makeID (params::drive), "Drive", unit, 0.0f));
 
     // --- Resonator Model ----------------------------------------------------
     layout.add (std::make_unique<APC> (makeID (params::resonatorMode),

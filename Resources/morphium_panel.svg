@@ -156,18 +156,24 @@
     <text class="section" x="0" y="0">CORE</text>
     <text class="pink-label" x="0" y="20">EXCITATION ENVELOPE</text>
     <!-- Background Circle bezels styled on panel -->
-    <g transform="translate(34 95)">
+    <g transform="translate(64 95)">
+      <!-- Row 1 -->
       <g>
         <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
         <text class="cyan-label" x="-20" y="50">ATTACK</text>
       </g>
-      <g transform="translate(95 0)">
+      <g transform="translate(100 0)">
         <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
         <text class="cyan-label" x="-17" y="50">DECAY</text>
       </g>
-      <g transform="translate(190 0)">
+      <!-- Row 2 -->
+      <g transform="translate(0 105)">
         <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
         <text class="cyan-label" x="-23" y="50">SUSTAIN</text>
+      </g>
+      <g transform="translate(100 105)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="50">RELEASE</text>
       </g>
     </g>
   </g>
@@ -249,7 +255,7 @@
       </g>
       <g transform="translate(160, 0)">
         <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
-        <text class="cyan-label" x="-23" y="44">RELEASE</text>
+        <text class="cyan-label" x="-17" y="44">DRIVE</text>
       </g>
       <!-- Row 2: LFO Depth, Reverb Mix, Output -->
       <g transform="translate(0, 110)">

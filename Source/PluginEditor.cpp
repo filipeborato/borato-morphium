@@ -495,7 +495,7 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
 
     // --- Envelope + output knobs -------------------------------------------
     for (auto* s : { &attackSlider, &decaySlider, &sustainSlider, &releaseSlider, &outputSlider,
-                     &lfoRateSlider, &lfoDepthSlider, &reverbSizeSlider, &reverbMixSlider })
+                     &lfoRateSlider, &lfoDepthSlider, &reverbSizeSlider, &reverbMixSlider, &driveSlider })
     {
         configureRotary (*s);
     }
@@ -508,6 +508,7 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     lfoDepthAtt    = std::make_unique<SliderAttachment> (apvts, params::lfoDepth,   lfoDepthSlider);
     reverbSizeAtt  = std::make_unique<SliderAttachment> (apvts, params::reverbSize,  reverbSizeSlider);
     reverbMixAtt   = std::make_unique<SliderAttachment> (apvts, params::reverbMix,   reverbMixSlider);
+    driveAtt       = std::make_unique<SliderAttachment> (apvts, params::drive,       driveSlider);
     outputAtt      = std::make_unique<SliderAttachment> (apvts, params::outputGain, outputSlider);
 
     // --- Borato Macro -------------------------------------------------------
@@ -727,15 +728,16 @@ void MorphiumAudioProcessorEditor::resized()
         resonatorButtons[(size_t) i].setBounds (svg (403.0f + (float) i * 64.0f, 430.0f, 52.0f, 20.0f));
     }
 
-    // CORE knobs -> A / D / S
-    attackSlider.setBounds  (svg (113, 454, 72, 72));
-    decaySlider.setBounds   (svg (208, 454, 72, 72));
-    sustainSlider.setBounds (svg (303, 454, 72, 72));
+    // CORE knobs -> A / D / S / R (2x2 grid)
+    attackSlider.setBounds  (svg (143, 454, 72, 72));
+    decaySlider.setBounds   (svg (243, 454, 72, 72));
+    sustainSlider.setBounds (svg (143, 559, 72, 72));
+    releaseSlider.setBounds (svg (243, 559, 72, 72));
 
     // MOTION/SPACE knobs -> 3 columns x 2 rows grid.
     lfoRateSlider.setBounds    (svg (910, 455, 60, 60));
     reverbSizeSlider.setBounds (svg (990, 455, 60, 60));
-    releaseSlider.setBounds    (svg (1070, 455, 60, 60));
+    driveSlider.setBounds      (svg (1070, 455, 60, 60));
     
     lfoDepthSlider.setBounds   (svg (910, 565, 60, 60));
     reverbMixSlider.setBounds  (svg (990, 565, 60, 60));

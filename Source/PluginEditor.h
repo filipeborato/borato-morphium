@@ -154,6 +154,7 @@ namespace morphium
         
         juce::Slider lfoRateSlider, lfoDepthSlider;
         juce::Slider reverbSizeSlider, reverbMixSlider;
+        juce::Slider driveSlider;
         
         juce::Slider outputSlider;
         MacroKnob    macroSlider;                // "Borato Macro": morph engine
@@ -162,6 +163,7 @@ namespace morphium
         std::unique_ptr<SliderAttachment> attackAtt, decayAtt, sustainAtt, releaseAtt;
         std::unique_ptr<SliderAttachment> lfoRateAtt, lfoDepthAtt;
         std::unique_ptr<SliderAttachment> reverbSizeAtt, reverbMixAtt;
+        std::unique_ptr<SliderAttachment> driveAtt;
         std::unique_ptr<SliderAttachment> outputAtt;
         
         std::unique_ptr<SliderAttachment> macroAtt;
