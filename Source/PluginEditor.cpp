@@ -289,7 +289,8 @@ void PresetDisplay::paint (juce::Graphics& g)
 {
     const float h = (float) getHeight();
     const float w = (float) getWidth();
-    auto bounds = getLocalBounds().toFloat().reduced (w * 0.05f, h * 0.14f);
+    const float sidePad = juce::jmin (30.0f, w * 0.12f);
+    auto bounds = getLocalBounds().toFloat().reduced (sidePad, h * 0.14f);
     const auto cyan = MorphiumLookAndFeel::ledCyan;
 
     auto drawLed = [&] (const juce::String& text, juce::Rectangle<float> area,
@@ -321,8 +322,9 @@ void PresetDisplay::paint (juce::Graphics& g)
     g.setColour (cyan.withAlpha (over ? 0.85f : 0.35f));
     g.setFont (juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(),
                                               h * 0.36f, juce::Font::bold)));
-    g.drawText ("<", full.removeFromLeft (w * 0.05f),  juce::Justification::centred, false);
-    g.drawText (">", full.removeFromRight (w * 0.05f), juce::Justification::centred, false);
+    const float arrowBox = juce::jmin (24.0f, w * 0.08f);
+    g.drawText ("<", full.removeFromLeft (arrowBox),  juce::Justification::centred, false);
+    g.drawText (">", full.removeFromRight (arrowBox), juce::Justification::centred, false);
 }
 
 void SourceButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down*/)
@@ -340,11 +342,11 @@ void SourceButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down
         g.fillRoundedRectangle (bounds, 6.0f);
     }
 
-    // LED, positioned like the original SVG (~82% across, top quarter).
-    const float ledSize = bounds.getHeight() * 0.19f;
+    // LED, positioned top-center for perfect symmetry
+    const float ledSize = bounds.getHeight() * 0.16f;
     const auto led = juce::Rectangle<float> (ledSize, ledSize)
-                         .withCentre ({ bounds.getX() + bounds.getWidth() * 0.82f,
-                                        bounds.getY() + bounds.getHeight() * 0.25f });
+                         .withCentre ({ bounds.getCentreX(),
+                                        bounds.getY() + 8.0f });
     if (selected)
     {
         g.setColour (MorphiumLookAndFeel::ledCyan.withAlpha (0.35f));
@@ -356,6 +358,12 @@ void SourceButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down
         g.setColour (juce::Colour { 0xff3a2222 });
     }
     g.fillEllipse (led);
+
+    // Draw text perfectly centered but shifted down slightly to accommodate the LED
+    g.setColour (juce::Colour { 0xff00f0ff }); // cyan
+    g.setFont (juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(),
+                                              bounds.getHeight() * 0.28f, juce::Font::bold)));
+    g.drawText (getButtonText(), bounds.withTrimmedTop(8.0f), juce::Justification::centred, false);
 }
 
 void ResonatorButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down*/)
@@ -402,10 +410,12 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     startTimerHz (30);  // animate the scope + keep the preset display in sync
 
     // --- Excitation source (the six SOURCE category buttons) ----------------
+    const char* sourceNames[] = { "IMPACT", "FRICTION", "AIR", "SYNTH", "NOISE", "TAPE" };
     const int categoryBases[] = {0, 3, 5, 7, 10, 11};
     for (int i = 0; i < numSources; ++i)
     {
         auto& button = sourceButtons[(size_t) i];
+        button.setButtonText (sourceNames[i]);
         int baseIdx = categoryBases[i];
         button.onClick = [this, baseIdx]
         {
@@ -700,37 +710,36 @@ void MorphiumAudioProcessorEditor::resized()
     // LED under the source buttons. SVG: transform="translate(885 311)" size 254x26
     excitationDisplay.setBounds (svg (885, 311, 254, 26));
 
-    // MATTER faders: base (395,450), 44 wide, 64 apart, 150 tall.
-    densitySlider.setBounds  (svg (395, 450, 44, 150));
-    massSlider.setBounds     (svg (459, 450, 44, 150));
-    frictionSlider.setBounds (svg (523, 450, 44, 150));
-    wearSlider.setBounds     (svg (587, 450, 44, 150));
+    // MATTER faders -> Y=458, Height=134 matches SVG slot inner track
+    densitySlider.setBounds  (svg (412, 458, 34, 134));
+    massSlider.setBounds     (svg (476, 458, 34, 134));
+    frictionSlider.setBounds (svg (540, 458, 34, 134));
+    wearSlider.setBounds     (svg (604, 458, 34, 134));
 
     // MACRO
-    macroSlider.setBounds  (svg (675, 430, 180, 180));
-    macroDisplay.setBounds (svg (715, 635, 120, 22));
+    // BORATO MACRO: the hero control. Centred at (792, 530)
+    macroSlider.setBounds  (svg (702, 440, 180, 180));
+    macroDisplay.setBounds (svg (732, 635, 120, 22));
 
     // RESONATOR Model buttons: positioned exactly above faders.
     for (int i = 0; i < numResonatorModes; ++i)
     {
-        resonatorButtons[(size_t) i].setBounds (svg (391.0f + (float) i * 64.0f, 430.0f, 52.0f, 20.0f));
+        resonatorButtons[(size_t) i].setBounds (svg (403.0f + (float) i * 64.0f, 430.0f, 52.0f, 20.0f));
     }
 
     // CORE knobs -> A / D / S
-    attackSlider.setBounds  (svg (97, 447, 86, 86));
-    decaySlider.setBounds   (svg (182, 447, 86, 86));
-    sustainSlider.setBounds (svg (267, 447, 86, 86));
+    attackSlider.setBounds  (svg (113, 454, 72, 72));
+    decaySlider.setBounds   (svg (208, 454, 72, 72));
+    sustainSlider.setBounds (svg (303, 454, 72, 72));
 
     // MOTION/SPACE knobs -> 3 columns x 2 rows grid.
-    lfoRateSlider.setBounds    (svg (910, 420, 60, 60));
-    reverbSizeSlider.setBounds (svg (990, 420, 60, 60));
-    releaseSlider.setBounds    (svg (1070, 420, 60, 60));
+    lfoRateSlider.setBounds    (svg (910, 455, 60, 60));
+    reverbSizeSlider.setBounds (svg (990, 455, 60, 60));
+    releaseSlider.setBounds    (svg (1070, 455, 60, 60));
     
-    lfoDepthSlider.setBounds   (svg (910, 510, 60, 60));
-    reverbMixSlider.setBounds  (svg (990, 510, 60, 60));
-    outputSlider.setBounds     (svg (1070, 510, 60, 60));
+    lfoDepthSlider.setBounds   (svg (910, 565, 60, 60));
+    reverbMixSlider.setBounds  (svg (990, 565, 60, 60));
+    outputSlider.setBounds     (svg (1070, 565, 60, 60));
 
-    // BORATO MACRO: the hero control. Centred at (775,538).
-    macroSlider.setBounds (svg (667, 430, 216, 216));
 }
 }

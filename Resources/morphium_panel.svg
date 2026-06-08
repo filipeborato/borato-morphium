@@ -136,13 +136,11 @@
       <rect x="0" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
       <rect x="88" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
       <rect x="176" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
-      <text class="cyan-label" x="18" y="22">IMPACT</text><text class="cyan-label" x="108" y="22">FRICT</text><text class="cyan-label" x="204" y="22">AIR</text>
     </g>
     <g transform="translate(0 48)">
       <rect x="0" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
       <rect x="88" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
       <rect x="176" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
-      <text class="cyan-label" x="20" y="22">SYNTH</text><text class="cyan-label" x="105" y="22">NOISE</text><text class="cyan-label" x="198" y="22">TAPE</text>
     </g>
     <g transform="translate(0 96)">
       <!-- Placeholder for ExcitationDisplay LED -->
@@ -158,18 +156,18 @@
     <text class="section" x="0" y="0">CORE</text>
     <text class="pink-label" x="0" y="20">EXCITATION ENVELOPE</text>
     <!-- Background Circle bezels styled on panel -->
-    <g transform="translate(25 95)">
+    <g transform="translate(34 95)">
       <g>
-        <circle r="41" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
-        <text class="cyan-label" x="-20" y="58">ATTACK</text>
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-20" y="50">ATTACK</text>
       </g>
-      <g transform="translate(85 0)">
-        <circle r="41" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
-        <text class="cyan-label" x="-17" y="58">DECAY</text>
+      <g transform="translate(95 0)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-17" y="50">DECAY</text>
       </g>
-      <g transform="translate(170 0)">
-        <circle r="41" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
-        <text class="cyan-label" x="-23" y="58">SUSTAIN</text>
+      <g transform="translate(190 0)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="50">SUSTAIN</text>
       </g>
     </g>
   </g>
@@ -181,7 +179,7 @@
     
     <!-- Resonator Model Buttons: OFF, METAL, GLASS, WOOD -->
     <!-- Center-aligned perfectly above the 4 Matter faders -->
-    <g transform="translate(20 35)">
+    <g transform="translate(32 35)">
       <!-- OFF (centered at x = 22) -->
       <rect x="-4" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
       <text class="cyan-label" x="22" y="13" text-anchor="middle" font-size="8">OFF</text>
@@ -200,7 +198,7 @@
     </g>
 
     <!-- Faders Slots -->
-    <g transform="translate(20 55)">
+    <g transform="translate(32 55)">
       <g>
         <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
         <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
@@ -226,10 +224,10 @@
 
   <!-- 3. BORATO MACRO Hero morph knob -->
   <g transform="translate(675 395)">
-    <text class="section" x="0" y="0">BORATO MACRO</text>
-    <text class="pink-label" x="0" y="20">MORPH MATRIX ENGINE</text>
+    <text class="section" x="117" y="0" text-anchor="middle">BORATO MACRO</text>
+    <text class="pink-label" x="117" y="20" text-anchor="middle">MORPH MATRIX ENGINE</text>
   </g>
-  <g transform="translate(715 635)">
+  <g transform="translate(732 635)">
     <!-- Placeholder for MacroDisplay LED -->
     <rect x="0" y="0" width="120" height="22" rx="4" fill="#0d041c" stroke="#00f0ff" stroke-opacity="0.4" stroke-width="1.5"/>
   </g>
@@ -239,7 +237,7 @@
     <text class="section" x="0" y="0">MOTION &amp; SPACE</text>
     <text class="pink-label" x="10" y="20">MODULATION · REVERB · CONTROL</text>
     <!-- Background Circle bezels in a 3x2 Grid on panel -->
-    <g transform="translate(30 55)">
+    <g transform="translate(30 90)">
       <!-- Row 1: LFO Rate, Reverb Size, Release -->
       <g transform="translate(0, 0)">
         <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
@@ -254,15 +252,15 @@
         <text class="cyan-label" x="-23" y="44">RELEASE</text>
       </g>
       <!-- Row 2: LFO Depth, Reverb Mix, Output -->
-      <g transform="translate(0, 90)">
+      <g transform="translate(0, 110)">
         <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
         <text class="cyan-label" x="-26" y="44">LFO DPTH</text>
       </g>
-      <g transform="translate(80, 90)">
+      <g transform="translate(80, 110)">
         <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
         <text class="cyan-label" x="-23" y="44">REV MIX</text>
       </g>
-      <g transform="translate(160, 90)">
+      <g transform="translate(160, 110)">
         <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
         <text class="cyan-label" x="-20" y="44">OUTPUT</text>
       </g>
