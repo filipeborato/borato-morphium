@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-br"><head><meta charset="utf-8">
+<title>Morphium — Layout Audit</title>
+<style>
+  body { background:#111; color:#ddd; font:14px/1.5 system-ui, sans-serif; margin:24px; }
+  h1 { font-size:18px; } small { color:#888; }
+  #stage { position:relative; width:1280px; max-width:100%; }
+  #stage svg { width:100%; height:auto; display:block; }
+  #overlay { position:absolute; inset:0; width:100%; height:100%; }
+  label { margin-right:16px; user-select:none; }
+  table { border-collapse:collapse; margin-top:16px; width:100%; max-width:1280px; }
+  td, th { border:1px solid #333; padding:4px 10px; text-align:left; vertical-align:top; }
+  tr.ok td:first-child    { color:#3ddc84; }
+  tr.info td:first-child  { color:#5ab4ff; }
+  tr.warn td:first-child  { color:#ffc24b; }
+  tr.error td:first-child { color:#ff5d5d; font-weight:bold; }
+  tr:hover { background:#1d1d2a; cursor:pointer; }
+</style></head><body>
+<h1>Borato Morphium — auditoria de layout
+  <small>(bounds JUCE × geometria SVG · regenere com <code>python tools/layout_audit.py</code>)</small></h1>
+<p>
+  <label><input type="checkbox" id="cbBounds" checked> bounds JUCE</label>
+  <label><input type="checkbox" id="cbAnchors" checked> âncoras SVG casadas</label>
+  <label><input type="checkbox" id="cbLabels"> bboxes de texto (estimados)</label>
+  <label><input type="checkbox" id="cbNames"> nomes</label>
+</p>
+<div id="stage">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760">
+  <defs>
+    <!-- Background Space/Brushed Metal Purple -->
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#140b24"/>
+      <stop offset="0.5" stop-color="#0a0512"/>
+      <stop offset="1" stop-color="#05010a"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff007f"/>
+      <stop offset="0.5" stop-color="#7b00cc"/>
+      <stop offset="1" stop-color="#00f0ff"/>
+    </linearGradient>
+    <linearGradient id="knob" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a153d"/>
+      <stop offset="0.45" stop-color="#150824"/>
+      <stop offset="1" stop-color="#05000a"/>
+    </linearGradient>
+    <linearGradient id="slot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c0014"/>
+      <stop offset="1" stop-color="#030008"/>
+    </linearGradient>
+    <!-- VFD/Teal Glass for Scope -->
+    <linearGradient id="glassTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#082121"/>
+      <stop offset="1" stop-color="#010505"/>
+    </linearGradient>
+    <!-- Hot Pink Glass for Presets -->
+    <linearGradient id="glassPink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b001a"/>
+      <stop offset="1" stop-color="#080005"/>
+    </linearGradient>
+    <!-- Sunset Gradient -->
+    <linearGradient id="sunset" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff007f"/>
+      <stop offset="0.5" stop-color="#ff4b00"/>
+      <stop offset="1" stop-color="#ffb800"/>
+    </linearGradient>
+    <!-- Glowing Filters -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="glowPink" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowCyan" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      .brand { font: 900 42px 'Impact', 'Arial Black', Arial, sans-serif; letter-spacing: 9px; fill: #ff007f; filter: url(#glowPink); }
+      .brandHi { font: 900 42px 'Impact', 'Arial Black', Arial, sans-serif; letter-spacing: 9px; fill: #00f0ff; filter: url(#glowCyan); }
+      .sub { font: 700 12px 'Arial Black', Arial, sans-serif; letter-spacing: 6px; fill: #00f0ff; }
+      .tag { font: 800 11px Arial, sans-serif; letter-spacing: 3px; fill: #ff007f; }
+      .section { font: 800 15px Arial, sans-serif; letter-spacing: 2px; fill: #00f0ff; filter: url(#glowCyan); }
+      .small { font: 700 10px Arial, sans-serif; letter-spacing: 1.1px; fill: #a291b5; }
+      .cyan-label { font: 800 9px Arial, sans-serif; letter-spacing: 1.2px; fill: #00f0ff; }
+      .pink-label { font: 800 9px Arial, sans-serif; letter-spacing: 1.2px; fill: #ff007f; }
+      .led { font-family: 'Courier New', monospace; fill: #ff007f; filter: url(#glowPink); }
+      .line { stroke: #ff007f; stroke-width: 1.5; opacity: 0.35; }
+      .grid-line { stroke: #411d66; stroke-width: 1; opacity: 0.45; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="760" fill="#06020c"/>
+
+  <!-- Background Wireframe Grid (Synthwave style) -->
+  <g stroke="#ff007f" stroke-width="0.5" opacity="0.08">
+    <path d="M 0,380 L 1280,380 M 0,420 L 1280,420 M 0,460 L 1280,460 M 0,500 L 1280,500 M 0,540 L 1280,540 M 0,580 L 1280,580 M 0,620 L 1280,620 M 0,660 L 1280,660 M 0,700 L 1280,700"/>
+    <path d="M 640,350 L 0,760 M 640,350 L 128,760 M 640,350 L 256,760 M 640,350 L 384,760 M 640,350 L 512,760 M 640,350 L 640,760 M 640,350 L 768,760 M 640,350 L 896,760 M 640,350 L 1024,760 M 640,350 L 1152,760 M 640,350 L 1280,760"/>
+  </g>
+
+  <!-- Chassis Outer Rim with Neon Glow Borders -->
+  <g filter="url(#shadow)">
+    <rect x="22" y="22" width="1236" height="716" rx="28" fill="url(#rim)"/>
+    <rect x="36" y="36" width="1208" height="688" rx="20" fill="url(#panel)"/>
+    <rect x="54" y="54" width="1172" height="652" rx="12" fill="none" stroke="#ff007f" stroke-opacity="0.65" stroke-width="2"/>
+    <rect x="60" y="60" width="1160" height="640" rx="10" fill="none" stroke="#00f0ff" stroke-opacity="0.45" stroke-width="1.5"/>
+  </g>
+
+  <!-- Hexagonal Machine Screws (Retro-Futuristic style) -->
+  <g fill="#1f0f33" stroke="#ff007f" stroke-width="2" stroke-opacity="0.8">
+    <circle cx="74" cy="74" r="10"/><circle cx="1206" cy="74" r="10"/>
+    <circle cx="74" cy="686" r="10"/><circle cx="1206" cy="686" r="10"/>
+  </g>
+  <g stroke="#00f0ff" stroke-width="1.5" stroke-linecap="round" opacity="0.9">
+    <line x1="74" y1="69" x2="74" y2="79"/><line x1="69" y1="74" x2="79" y2="74"/>
+    <line x1="1206" y1="69" x2="1206" y2="79"/><line x1="1201" y1="74" x2="1211" y2="74"/>
+    <line x1="74" y1="681" x2="74" y2="691"/><line x1="69" y1="686" x2="79" y2="686"/>
+    <line x1="1206" y1="681" x2="1206" y2="691"/><line x1="1201" y1="686" x2="1211" y2="686"/>
+  </g>
+
+  <!-- 80s Cyber Sunset Logo -->
+  <g transform="translate(90, 75)">
+    <!-- Retro Sun -->
+    <path d="M 0,55 A 40,40 0 1,1 80,55 Z" fill="url(#sunset)" filter="url(#glowPink)"/>
+    <!-- Horizon Stripes -->
+    <rect x="0" y="58" width="80" height="2" fill="#140b24"/>
+    <rect x="0" y="62" width="80" height="3.5" fill="#140b24"/>
+    <rect x="0" y="68" width="80" height="5" fill="#140b24"/>
+    <rect x="0" y="75" width="80" height="7" fill="#140b24"/>
+  </g>
+
+  <!-- Header: Synthwave Wordmark & Glow effects -->
+  <text class="brand" x="195" y="125">BORATO MORPHIUM</text>
+  <rect x="195" y="134" width="120" height="4" rx="2" fill="#ff007f" filter="url(#glowPink)"/>
+  <text class="sub" x="330" y="139">SOUND MATTER SYNTHESIZER</text>
+  <text class="tag" x="195" y="165">M-01 · OUTRUN HYBRID</text>
+  
+  <text class="cyan-label" text-anchor="end" x="1145" y="136">EXCITATION → MATTER RESONATOR → MOTION → SPACE</text>
+  <text class="small" text-anchor="end" x="1145" y="158">NEON RACK / VST3 / BUILD 0.2</text>
+
+  <!-- Top Display Row -->
+  <!-- Left Display: Preset screen with Hot Pink Glass -->
+  <g transform="translate(135 215)">
+    <rect x="0" y="0" width="420" height="105" rx="10" fill="#ff007f" opacity="0.15" stroke="#ff007f" stroke-width="1.5"/>
+    <rect x="12" y="12" width="396" height="81" rx="6" fill="url(#glassPink)" stroke="#ff007f" stroke-width="3.5" filter="url(#glowPink)"/>
+  </g>
+
+  <!-- Right Display: Scope screen with VFD/Cyan Glass & grid -->
+  <g transform="translate(595 215)">
+    <rect x="0" y="0" width="250" height="105" rx="10" fill="#00f0ff" opacity="0.15" stroke="#00f0ff" stroke-width="1.5"/>
+    <rect x="13" y="13" width="224" height="79" rx="6" fill="url(#glassTeal)" stroke="#00f0ff" stroke-width="3.5" filter="url(#glowCyan)"/>
+    <!-- CRT Grid lines -->
+    <g stroke="#00f0ff" stroke-width="0.75" opacity="0.25">
+      <line x1="25" y1="38" x2="225" y2="38"/><line x1="25" y1="65" x2="225" y2="65"/>
+      <line x1="65" y1="23" x2="65" y2="84"/><line x1="105" y1="23" x2="105" y2="84"/><line x1="145" y1="23" x2="145" y2="84"/><line x1="185" y1="23" x2="185" y2="84"/>
+    </g>
+  </g>
+
+  <!-- Source buttons: Styled as Glowing Neon Selection grid -->
+  <g transform="translate(885 215)">
+    <text class="section" x="0" y="-14">SOURCE EXCITER</text>
+    <g>
+      <rect x="0" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="88" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="176" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+    </g>
+    <g transform="translate(0 48)">
+      <rect x="0" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="88" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="176" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+    </g>
+    <g transform="translate(0 96)">
+      <!-- Placeholder for ExcitationDisplay LED -->
+      <rect x="0" y="0" width="254" height="26" rx="4" fill="#0d041c" stroke="#00f0ff" stroke-opacity="0.4" stroke-width="1.5"/>
+    </g>
+  </g>
+
+  <line class="line" x1="135" y1="355" x2="1145" y2="355"/>
+
+  <!-- Lower grid panels -->
+  <!-- 1. CORE Section -->
+  <g transform="translate(115 395)">
+    <text class="section" x="0" y="0">CORE</text>
+    <text class="pink-label" x="0" y="20">EXCITATION ENVELOPE</text>
+    <!-- Background Circle bezels styled on panel -->
+    <g transform="translate(64 95)">
+      <!-- Row 1 -->
+      <g>
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-20" y="50">ATTACK</text>
+      </g>
+      <g transform="translate(100 0)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-17" y="50">DECAY</text>
+      </g>
+      <!-- Row 2 -->
+      <g transform="translate(0 105)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="50">SUSTAIN</text>
+      </g>
+      <g transform="translate(100 105)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="50">RELEASE</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- 2. MATTER Section (Faders + Resonator Selector) -->
+  <g transform="translate(375 395)">
+    <text class="section" x="0" y="0">MATTER</text>
+    <text class="pink-label" x="0" y="20">MODAL RESONATOR &amp; SHAPING</text>
+    
+    <!-- Resonator Model Buttons: OFF, METAL, GLASS, WOOD -->
+    <!-- Center-aligned perfectly above the 4 Matter faders -->
+    <g transform="translate(32 35)">
+      <!-- OFF (centered at x = 22) -->
+      <rect x="-4" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="22" y="13" text-anchor="middle" font-size="8">OFF</text>
+      
+      <!-- METAL (centered at x = 86) -->
+      <rect x="60" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="86" y="13" text-anchor="middle" font-size="8">METAL</text>
+
+      <!-- GLASS (centered at x = 150) -->
+      <rect x="124" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="150" y="13" text-anchor="middle" font-size="8">GLASS</text>
+
+      <!-- WOOD (centered at x = 214) -->
+      <rect x="188" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="214" y="13" text-anchor="middle" font-size="8">WOOD</text>
+    </g>
+
+    <!-- Faders Slots -->
+    <g transform="translate(32 55)">
+      <g>
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="8" y="174">DENS</text>
+      </g>
+      <g transform="translate(64 0)">
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="8" y="174">MASS</text>
+      </g>
+      <g transform="translate(128 0)">
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="5" y="174">FRICT</text>
+      </g>
+      <g transform="translate(192 0)">
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="8" y="174">WEAR</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- 3. BORATO MACRO Hero morph knob -->
+  <g transform="translate(675 395)">
+    <text class="section" x="117" y="0" text-anchor="middle">BORATO MACRO</text>
+    <text class="pink-label" x="117" y="20" text-anchor="middle">MORPH MATRIX ENGINE</text>
+  </g>
+  <g transform="translate(732 635)">
+    <!-- Placeholder for MacroDisplay LED -->
+    <rect x="0" y="0" width="120" height="22" rx="4" fill="#0d041c" stroke="#00f0ff" stroke-opacity="0.4" stroke-width="1.5"/>
+  </g>
+
+  <!-- 4. MOTION / SPACE Grid Knobs (LFO, Reverb, Release, Output) -->
+  <g transform="translate(910 395)">
+    <text class="section" x="0" y="0">MOTION &amp; SPACE</text>
+    <text class="pink-label" x="10" y="20">MODULATION · REVERB · CONTROL</text>
+    <!-- Background Circle bezels in a 3x2 Grid on panel -->
+    <!-- Row centers y=490/595 match the CORE (ADSR) rows: 105 apart -->
+    <g transform="translate(30 95)">
+      <!-- Row 1: LFO Rate, Reverb Size, Release -->
+      <g transform="translate(0, 0)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-26" y="44">LFO RATE</text>
+      </g>
+      <g transform="translate(80, 0)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-26" y="44">REV SIZE</text>
+      </g>
+      <g transform="translate(160, 0)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-17" y="44">DRIVE</text>
+      </g>
+      <!-- Row 2: LFO Depth, Reverb Mix, Output -->
+      <g transform="translate(0, 105)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-26" y="44">LFO DPTH</text>
+      </g>
+      <g transform="translate(80, 105)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="44">REV MIX</text>
+      </g>
+      <g transform="translate(160, 105)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-20" y="44">OUTPUT</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Footers -->
+  <text class="small" x="135" y="685">BORATO COMPANY · CURITIBA · NEON CYBERPUNK LABS</text>
+  <text class="cyan-label" text-anchor="end" x="1145" y="685">OUTRUN SYNTHWAVE DESIGN SYSTEM</text>
+</svg>
+
+<canvas id="overlay" width="1280" height="760"></canvas>
+</div>
+<table id="tbl"><thead>
+<tr><th>nível</th><th>controle</th><th>diagnóstico</th></tr></thead><tbody></tbody></table>
+<script>
+const DATA = {"controls": [{"name": "sourceButtons[0]", "x": 885.0, "y": 215.0, "w": 78.0, "h": 36.0, "cx": 924.0, "cy": 233.0, "kind": "button", "anchor": {"type": "rect", "x": 885.0, "y": 215.0, "w": 78.0, "h": 36.0}}, {"name": "sourceButtons[1]", "x": 973.0, "y": 215.0, "w": 78.0, "h": 36.0, "cx": 1012.0, "cy": 233.0, "kind": "button", "anchor": {"type": "rect", "x": 973.0, "y": 215.0, "w": 78.0, "h": 36.0}}, {"name": "sourceButtons[2]", "x": 1061.0, "y": 215.0, "w": 78.0, "h": 36.0, "cx": 1100.0, "cy": 233.0, "kind": "button", "anchor": {"type": "rect", "x": 1061.0, "y": 215.0, "w": 78.0, "h": 36.0}}, {"name": "sourceButtons[3]", "x": 885.0, "y": 263.0, "w": 78.0, "h": 36.0, "cx": 924.0, "cy": 281.0, "kind": "button", "anchor": {"type": "rect", "x": 885.0, "y": 263.0, "w": 78.0, "h": 36.0}}, {"name": "sourceButtons[4]", "x": 973.0, "y": 263.0, "w": 78.0, "h": 36.0, "cx": 1012.0, "cy": 281.0, "kind": "button", "anchor": {"type": "rect", "x": 973.0, "y": 263.0, "w": 78.0, "h": 36.0}}, {"name": "sourceButtons[5]", "x": 1061.0, "y": 263.0, "w": 78.0, "h": 36.0, "cx": 1100.0, "cy": 281.0, "kind": "button", "anchor": {"type": "rect", "x": 1061.0, "y": 263.0, "w": 78.0, "h": 36.0}}, {"name": "resonatorButtons[0]", "x": 403.0, "y": 430.0, "w": 52.0, "h": 20.0, "cx": 429.0, "cy": 440.0, "kind": "button", "anchor": {"type": "rect", "x": 403.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"name": "resonatorButtons[1]", "x": 467.0, "y": 430.0, "w": 52.0, "h": 20.0, "cx": 493.0, "cy": 440.0, "kind": "button", "anchor": {"type": "rect", "x": 467.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"name": "resonatorButtons[2]", "x": 531.0, "y": 430.0, "w": 52.0, "h": 20.0, "cx": 557.0, "cy": 440.0, "kind": "button", "anchor": {"type": "rect", "x": 531.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"name": "resonatorButtons[3]", "x": 595.0, "y": 430.0, "w": 52.0, "h": 20.0, "cx": 621.0, "cy": 440.0, "kind": "button", "anchor": {"type": "rect", "x": 595.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"name": "presetDisplay", "x": 147.0, "y": 227.0, "w": 396.0, "h": 81.0, "cx": 345.0, "cy": 267.5, "kind": "display", "anchor": {"type": "rect", "x": 135.0, "y": 215.0, "w": 420.0, "h": 105.0}}, {"name": "waveDisplay", "x": 608.0, "y": 228.0, "w": 224.0, "h": 79.0, "cx": 720.0, "cy": 267.5, "kind": "display", "anchor": {"type": "rect", "x": 595.0, "y": 215.0, "w": 250.0, "h": 105.0}}, {"name": "excitationDisplay", "x": 885.0, "y": 311.0, "w": 254.0, "h": 26.0, "cx": 1012.0, "cy": 324.0, "kind": "display", "anchor": {"type": "rect", "x": 885.0, "y": 311.0, "w": 254.0, "h": 26.0}}, {"name": "densitySlider", "x": 412.0, "y": 458.0, "w": 34.0, "h": 134.0, "cx": 429.0, "cy": 525.0, "kind": "fader", "anchor": {"type": "rect", "x": 407.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"name": "massSlider", "x": 476.0, "y": 458.0, "w": 34.0, "h": 134.0, "cx": 493.0, "cy": 525.0, "kind": "fader", "anchor": {"type": "rect", "x": 471.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"name": "frictionSlider", "x": 540.0, "y": 458.0, "w": 34.0, "h": 134.0, "cx": 557.0, "cy": 525.0, "kind": "fader", "anchor": {"type": "rect", "x": 535.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"name": "wearSlider", "x": 604.0, "y": 458.0, "w": 34.0, "h": 134.0, "cx": 621.0, "cy": 525.0, "kind": "fader", "anchor": {"type": "rect", "x": 599.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"name": "macroSlider", "x": 702.0, "y": 440.0, "w": 180.0, "h": 180.0, "cx": 792.0, "cy": 530.0, "kind": "rotary"}, {"name": "macroDisplay", "x": 732.0, "y": 635.0, "w": 120.0, "h": 22.0, "cx": 792.0, "cy": 646.0, "kind": "display", "anchor": {"type": "rect", "x": 732.0, "y": 635.0, "w": 120.0, "h": 22.0}}, {"name": "attackSlider", "x": 143.0, "y": 454.0, "w": 72.0, "h": 72.0, "cx": 179.0, "cy": 490.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 179.0, "cy": 490.0, "r": 34.0}}, {"name": "decaySlider", "x": 243.0, "y": 454.0, "w": 72.0, "h": 72.0, "cx": 279.0, "cy": 490.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 279.0, "cy": 490.0, "r": 34.0}}, {"name": "sustainSlider", "x": 143.0, "y": 559.0, "w": 72.0, "h": 72.0, "cx": 179.0, "cy": 595.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 179.0, "cy": 595.0, "r": 34.0}}, {"name": "releaseSlider", "x": 243.0, "y": 559.0, "w": 72.0, "h": 72.0, "cx": 279.0, "cy": 595.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 279.0, "cy": 595.0, "r": 34.0}}, {"name": "lfoRateSlider", "x": 910.0, "y": 460.0, "w": 60.0, "h": 60.0, "cx": 940.0, "cy": 490.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 940.0, "cy": 490.0, "r": 30.0}}, {"name": "reverbSizeSlider", "x": 990.0, "y": 460.0, "w": 60.0, "h": 60.0, "cx": 1020.0, "cy": 490.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 1020.0, "cy": 490.0, "r": 30.0}}, {"name": "driveSlider", "x": 1070.0, "y": 460.0, "w": 60.0, "h": 60.0, "cx": 1100.0, "cy": 490.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 1100.0, "cy": 490.0, "r": 30.0}}, {"name": "lfoDepthSlider", "x": 910.0, "y": 565.0, "w": 60.0, "h": 60.0, "cx": 940.0, "cy": 595.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 940.0, "cy": 595.0, "r": 30.0}}, {"name": "reverbMixSlider", "x": 990.0, "y": 565.0, "w": 60.0, "h": 60.0, "cx": 1020.0, "cy": 595.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 1020.0, "cy": 595.0, "r": 30.0}}, {"name": "outputSlider", "x": 1070.0, "y": 565.0, "w": 60.0, "h": 60.0, "cx": 1100.0, "cy": 595.0, "kind": "rotary", "anchor": {"type": "circle", "cx": 1100.0, "cy": 595.0, "r": 30.0}}], "findings": [{"level": "ok", "control": "sourceButtons[0]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 885.0, "y": 215.0, "w": 78.0, "h": 36.0}}, {"level": "ok", "control": "sourceButtons[1]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 973.0, "y": 215.0, "w": 78.0, "h": 36.0}}, {"level": "ok", "control": "sourceButtons[2]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 1061.0, "y": 215.0, "w": 78.0, "h": 36.0}}, {"level": "ok", "control": "sourceButtons[3]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 885.0, "y": 263.0, "w": 78.0, "h": 36.0}}, {"level": "ok", "control": "sourceButtons[4]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 973.0, "y": 263.0, "w": 78.0, "h": 36.0}}, {"level": "ok", "control": "sourceButtons[5]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 1061.0, "y": 263.0, "w": 78.0, "h": 36.0}}, {"level": "ok", "control": "resonatorButtons[0]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 403.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"level": "ok", "control": "resonatorButtons[1]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 467.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"level": "ok", "control": "resonatorButtons[2]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 531.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"level": "ok", "control": "resonatorButtons[3]", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 595.0, "y": 430.0, "w": 52.0, "h": 20.0}}, {"level": "ok", "control": "presetDisplay", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 135.0, "y": 215.0, "w": 420.0, "h": 105.0}}, {"level": "ok", "control": "waveDisplay", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 595.0, "y": 215.0, "w": 250.0, "h": 105.0}}, {"level": "ok", "control": "excitationDisplay", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 885.0, "y": 311.0, "w": 254.0, "h": 26.0}}, {"level": "ok", "control": "densitySlider", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 407.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"level": "ok", "control": "massSlider", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 471.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"level": "ok", "control": "frictionSlider", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 535.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"level": "ok", "control": "wearSlider", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 599.0, "y": 450.0, "w": 44.0, "h": 150.0}}, {"level": "info", "control": "macroSlider", "message": "sem bezel circular correspondente no SVG (controle custom-drawn?)", "anchor": null}, {"level": "ok", "control": "macroDisplay", "message": "alinhado ao slot SVG", "anchor": {"type": "rect", "x": 732.0, "y": 635.0, "w": 120.0, "h": 22.0}}, {"level": "ok", "control": "attackSlider", "message": "centrado no bezel (bezel ⌀68 vs bounds 72)", "anchor": {"type": "circle", "cx": 179.0, "cy": 490.0, "r": 34.0}}, {"level": "ok", "control": "decaySlider", "message": "centrado no bezel (bezel ⌀68 vs bounds 72)", "anchor": {"type": "circle", "cx": 279.0, "cy": 490.0, "r": 34.0}}, {"level": "ok", "control": "sustainSlider", "message": "centrado no bezel (bezel ⌀68 vs bounds 72)", "anchor": {"type": "circle", "cx": 179.0, "cy": 595.0, "r": 34.0}}, {"level": "ok", "control": "releaseSlider", "message": "centrado no bezel (bezel ⌀68 vs bounds 72)", "anchor": {"type": "circle", "cx": 279.0, "cy": 595.0, "r": 34.0}}, {"level": "ok", "control": "lfoRateSlider", "message": "centrado no bezel", "anchor": {"type": "circle", "cx": 940.0, "cy": 490.0, "r": 30.0}}, {"level": "ok", "control": "reverbSizeSlider", "message": "centrado no bezel", "anchor": {"type": "circle", "cx": 1020.0, "cy": 490.0, "r": 30.0}}, {"level": "ok", "control": "driveSlider", "message": "centrado no bezel", "anchor": {"type": "circle", "cx": 1100.0, "cy": 490.0, "r": 30.0}}, {"level": "ok", "control": "lfoDepthSlider", "message": "centrado no bezel", "anchor": {"type": "circle", "cx": 940.0, "cy": 595.0, "r": 30.0}}, {"level": "ok", "control": "reverbMixSlider", "message": "centrado no bezel", "anchor": {"type": "circle", "cx": 1020.0, "cy": 595.0, "r": 30.0}}, {"level": "ok", "control": "outputSlider", "message": "centrado no bezel", "anchor": {"type": "circle", "cx": 1100.0, "cy": 595.0, "r": 30.0}}], "texts": [{"x": 195.0, "y": 91.4, "w": 516.6, "h": 42.0, "text": "BORATO MORPHIUM", "cls": "brand"}, {"x": 330.0, "y": 129.4, "w": 316.56, "h": 12.0, "text": "SOUND MATTER SYNTHESIZER", "cls": "sub"}, {"x": 195.0, "y": 156.2, "w": 193.4, "h": 11.0, "text": "M-01 · OUTRUN HYBRID", "cls": "tag"}, {"x": 834.3199999999999, "y": 128.8, "w": 310.68, "h": 9.0, "text": "EXCITATION → MATTER RESONATOR → MOTION → SPACE", "cls": "cyan-label"}, {"x": 941.7, "y": 150.0, "w": 203.3, "h": 10.0, "text": "NEON RACK / VST3 / BUILD 0.2", "cls": "small"}, {"x": 885.0, "y": 189.0, "w": 156.2, "h": 15.0, "text": "SOURCE EXCITER", "cls": "section"}, {"x": 115.0, "y": 383.0, "w": 43.2, "h": 15.0, "text": "CORE", "cls": "section"}, {"x": 115.0, "y": 407.8, "w": 127.61999999999999, "h": 9.0, "text": "EXCITATION ENVELOPE", "cls": "pink-label"}, {"x": 159.0, "y": 532.8, "w": 39.48, "h": 9.0, "text": "ATTACK", "cls": "cyan-label"}, {"x": 262.0, "y": 532.8, "w": 32.699999999999996, "h": 9.0, "text": "DECAY", "cls": "cyan-label"}, {"x": 156.0, "y": 637.8, "w": 46.260000000000005, "h": 9.0, "text": "SUSTAIN", "cls": "cyan-label"}, {"x": 256.0, "y": 637.8, "w": 46.260000000000005, "h": 9.0, "text": "RELEASE", "cls": "cyan-label"}, {"x": 375.0, "y": 383.0, "w": 65.8, "h": 15.0, "text": "MATTER", "cls": "section"}, {"x": 375.0, "y": 407.8, "w": 168.3, "h": 9.0, "text": "MODAL RESONATOR & SHAPING", "cls": "pink-label"}, {"x": 420.36, "y": 436.6, "w": 17.279999999999998, "h": 8.0, "text": "OFF", "cls": "cyan-label"}, {"x": 478.2, "y": 436.6, "w": 29.6, "h": 8.0, "text": "METAL", "cls": "cyan-label"}, {"x": 542.2, "y": 436.6, "w": 29.6, "h": 8.0, "text": "GLASS", "cls": "cyan-label"}, {"x": 609.28, "y": 436.6, "w": 23.439999999999998, "h": 8.0, "text": "WOOD", "cls": "cyan-label"}, {"x": 415.0, "y": 616.8, "w": 25.92, "h": 9.0, "text": "DENS", "cls": "cyan-label"}, {"x": 479.0, "y": 616.8, "w": 25.92, "h": 9.0, "text": "MASS", "cls": "cyan-label"}, {"x": 540.0, "y": 616.8, "w": 32.699999999999996, "h": 9.0, "text": "FRICT", "cls": "cyan-label"}, {"x": 607.0, "y": 616.8, "w": 25.92, "h": 9.0, "text": "WEAR", "cls": "cyan-label"}, {"x": 725.2, "y": 383.0, "w": 133.6, "h": 15.0, "text": "BORATO MACRO", "cls": "section"}, {"x": 728.19, "y": 407.8, "w": 127.61999999999999, "h": 9.0, "text": "MORPH MATRIX ENGINE", "cls": "pink-label"}, {"x": 910.0, "y": 383.0, "w": 156.2, "h": 15.0, "text": "MOTION & SPACE", "cls": "section"}, {"x": 920.0, "y": 407.8, "w": 195.42, "h": 9.0, "text": "MODULATION · REVERB · CONTROL", "cls": "pink-label"}, {"x": 914.0, "y": 526.8, "w": 53.04, "h": 9.0, "text": "LFO RATE", "cls": "cyan-label"}, {"x": 994.0, "y": 526.8, "w": 53.04, "h": 9.0, "text": "REV SIZE", "cls": "cyan-label"}, {"x": 1083.0, "y": 526.8, "w": 32.699999999999996, "h": 9.0, "text": "DRIVE", "cls": "cyan-label"}, {"x": 914.0, "y": 631.8, "w": 53.04, "h": 9.0, "text": "LFO DPTH", "cls": "cyan-label"}, {"x": 997.0, "y": 631.8, "w": 46.260000000000005, "h": 9.0, "text": "REV MIX", "cls": "cyan-label"}, {"x": 1080.0, "y": 631.8, "w": 39.48, "h": 9.0, "text": "OUTPUT", "cls": "cyan-label"}, {"x": 135.0, "y": 677.0, "w": 342.0, "h": 10.0, "text": "BORATO COMPANY · CURITIBA · NEON CYBERPUNK LABS", "cls": "small"}, {"x": 942.8, "y": 677.8, "w": 202.2, "h": 9.0, "text": "OUTRUN SYNTHWAVE DESIGN SYSTEM", "cls": "cyan-label"}], "w": 1280.0, "h": 760.0};
+const canvas = document.getElementById('overlay');
+const ctx = canvas.getContext('2d');
+let highlight = null;
+
+function draw() {
+  ctx.clearRect(0, 0, DATA.w, DATA.h);
+  if (document.getElementById('cbLabels').checked)
+    for (const t of DATA.texts) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.6;
+      ctx.strokeRect(t.x, t.y, t.w, t.h);
+    }
+  for (const c of DATA.controls) {
+    const hot = highlight && highlight.includes(c.name);
+    if (document.getElementById('cbAnchors').checked && c.anchor) {
+      ctx.strokeStyle = hot ? '#fff' : 'rgba(61,220,132,0.9)';
+      ctx.lineWidth = hot ? 2.5 : 1.2;
+      ctx.setLineDash([4, 3]);
+      if (c.anchor.type === 'circle') {
+        ctx.beginPath(); ctx.arc(c.anchor.cx, c.anchor.cy, c.anchor.r, 0, 7); ctx.stroke();
+      } else
+        ctx.strokeRect(c.anchor.x, c.anchor.y, c.anchor.w, c.anchor.h);
+      ctx.setLineDash([]);
+    }
+    if (document.getElementById('cbBounds').checked) {
+      const bad = DATA.findings.some(f => f.level === 'error' && f.control.includes(c.name));
+      ctx.strokeStyle = hot ? '#fff' : (bad ? 'rgba(255,93,93,0.95)' : 'rgba(0,240,255,0.85)');
+      ctx.lineWidth = hot ? 3 : 1.4;
+      ctx.strokeRect(c.x, c.y, c.w, c.h);
+      ctx.beginPath(); ctx.moveTo(c.cx - 4, c.cy); ctx.lineTo(c.cx + 4, c.cy);
+      ctx.moveTo(c.cx, c.cy - 4); ctx.lineTo(c.cx, c.cy + 4); ctx.stroke();
+      if (document.getElementById('cbNames').checked || hot) {
+        ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+        ctx.fillText(c.name, c.x + 2, c.y - 3);
+      }
+    }
+  }
+}
+
+const tbody = document.querySelector('#tbl tbody');
+const order = { error: 0, warn: 1, info: 2, ok: 3 };
+for (const f of [...DATA.findings].sort((a, b) => order[a.level] - order[b.level])) {
+  const tr = document.createElement('tr');
+  tr.className = f.level;
+  tr.innerHTML = `<td>${f.level.toUpperCase()}</td><td><code>${f.control}</code></td><td>${f.message}</td>`;
+  tr.onmouseenter = () => { highlight = f.control; draw(); };
+  tr.onmouseleave = () => { highlight = null; draw(); };
+  tbody.appendChild(tr);
+}
+for (const id of ['cbBounds', 'cbAnchors', 'cbLabels', 'cbNames'])
+  document.getElementById(id).onchange = draw;
+draw();
+</script></body></html>
