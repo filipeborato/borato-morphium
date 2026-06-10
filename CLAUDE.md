@@ -27,7 +27,11 @@ Windows installer (after a Release build of both targets):
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\BoratoMorphium.iss
 ```
 
-When releasing, bump the version in both `CMakeLists.txt` (`project(... VERSION)`) and `#define MyAppVersion` in `installer/BoratoMorphium.iss`.
+When releasing, bump the version in `CMakeLists.txt` (`project(... VERSION)`) — CI reads it from there and also injects it into the Inno Setup script (whose `#define MyAppVersion` is only a local fallback).
+
+## CI (GitHub Actions)
+
+`.github/workflows/build-release-artifacts.yml` builds on every push to `main`/`release`/`ci/**` and on `v*` tags: Windows x64 (VST3 + Standalone + CLAP + Inno Setup installer), macOS arm64 + Intel (VST3 + AU + CLAP + Standalone, with mandatory `auval -v aumu Mph1 Bora`), and Ubuntu (VST3 + CLAP + Standalone). Tag pushes attach all artifacts to a draft GitHub Release. CLAP is built via clap-juce-extensions, enabled with `-DMORPHIUM_BUILD_CLAP=ON` (OFF by default locally).
 
 There are no automated tests; verification is building the Standalone and playing it.
 
