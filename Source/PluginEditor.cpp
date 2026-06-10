@@ -46,43 +46,45 @@ namespace
         return (s - std::floor (s)) * 2.0f - 1.0f;
     }
 
-    // Stylised waveform per excitation source, x in [0, 1), output in [-1, 1].
-    float waveSample (int type, float x, float phase) noexcept
+    // Stylised waveform per SOURCE family, x in [0, 1), output in [-1, 1].
+    // Family order matches the six SOURCE buttons:
+    // 0 IMPACT · 1 FRICTION · 2 AIR · 3 SYNTH · 4 NOISE · 5 TAPE.
+    float waveSample (int family, float x, float phase) noexcept
     {
         constexpr float tau = juce::MathConstants<float>::twoPi;
 
-        switch (type)
+        switch (family)
         {
-            case 0: // Bow: smooth tone with a faint upper harmonic
-                return 0.78f * std::sin (tau * (x * 2.0f + phase))
-                     + 0.16f * std::sin (tau * (x * 6.0f + phase));
-
-            case 1: // Strike: a struck, decaying tone
+            case 0: // IMPACT: a struck, decaying tone
             {
                 const float env = std::exp (-x * 3.4f);
                 return env * std::sin (tau * (x * 5.0f + phase * 0.25f));
             }
 
-            case 2: // Tape: wobbling sawtooth
-            {
-                const float wobble = 0.05f * std::sin (tau * (x * 0.5f + phase));
-                const float t = std::fmod (x * 2.5f + phase + wobble + 4.0f, 1.0f);
-                return (t * 2.0f - 1.0f) * 0.78f;
-            }
+            case 1: // FRICTION: smooth bowed tone with a faint upper harmonic
+                return 0.78f * std::sin (tau * (x * 2.0f + phase))
+                     + 0.16f * std::sin (tau * (x * 6.0f + phase));
 
-            case 3: // Voice: two formant-like partials
+            case 2: // AIR: two formant-like partials
                 return 0.5f * std::sin (tau * (x * 3.0f + phase))
                      + 0.4f * std::sin (tau * (x * 7.0f + phase * 1.3f));
 
-            case 4: // Noise: filtered jitter
-                return 0.7f * scrollNoise (x, phase, 911.0f);
-
-            case 5: // Spark: bright transient + noisy decay
+            case 3: // SYNTH: bright transient + noisy decay
             {
                 const float env = std::exp (-x * 7.5f);
                 const float spike = (x < 0.04f) ? 1.0f : 0.0f;
                 return juce::jlimit (-1.0f, 1.0f,
                                      env * (spike + 0.55f * scrollNoise (x, phase, 1300.0f)));
+            }
+
+            case 4: // NOISE: filtered jitter
+                return 0.7f * scrollNoise (x, phase, 911.0f);
+
+            case 5: // TAPE: wobbling sawtooth
+            {
+                const float wobble = 0.05f * std::sin (tau * (x * 0.5f + phase));
+                const float t = std::fmod (x * 2.5f + phase + wobble + 4.0f, 1.0f);
+                return (t * 2.0f - 1.0f) * 0.78f;
             }
 
             default:
@@ -156,16 +158,26 @@ void MorphiumAudioProcessorEditor::applyMacro (float amount, int mode)
 void WaveDisplay::paint (juce::Graphics& g)
 {
     const auto area = getLocalBounds().toFloat().reduced (getWidth() * 0.03f, getHeight() * 0.12f);
-    const int type = excitationParam != nullptr
-                       ? juce::jlimit (0, 5, juce::roundToInt (excitationParam->load()))
-                       : 0;
+
+    // The parameter holds 13 excitation types; fold the index into its SOURCE
+    // family so the scope draws one wave per family (same grouping as the
+    // category buttons / ExcitationType enum).
+    const int index = excitationParam != nullptr
+                        ? juce::roundToInt (excitationParam->load())
+                        : 0;
+    int family = 0;                      // 0..2  -> IMPACT
+    if      (index >= 11) family = 5;    // 11..12 -> TAPE
+    else if (index >= 10) family = 4;    // 10     -> NOISE
+    else if (index >= 7)  family = 3;    // 7..9   -> SYNTH
+    else if (index >= 5)  family = 2;    // 5..6   -> AIR
+    else if (index >= 3)  family = 1;    // 3..4   -> FRICTION
 
     juce::Path path;
     constexpr int points = 110;
     for (int i = 0; i <= points; ++i)
     {
         const float x  = (float) i / (float) points;
-        const float v  = waveSample (type, x, phase);
+        const float v  = waveSample (family, x, phase);
         const float px = area.getX() + x * area.getWidth();
         const float py = area.getCentreY() - v * area.getHeight() * 0.42f;
 
@@ -735,9 +747,10 @@ void MorphiumAudioProcessorEditor::resized()
     releaseSlider.setBounds (svg (243, 559, 72, 72));
 
     // MOTION/SPACE knobs -> 3 columns x 2 rows grid.
-    lfoRateSlider.setBounds    (svg (910, 455, 60, 60));
-    reverbSizeSlider.setBounds (svg (990, 455, 60, 60));
-    driveSlider.setBounds      (svg (1070, 455, 60, 60));
+    // Row centers (y=490, y=595) line up with the CORE ADSR rows.
+    lfoRateSlider.setBounds    (svg (910, 460, 60, 60));
+    reverbSizeSlider.setBounds (svg (990, 460, 60, 60));
+    driveSlider.setBounds      (svg (1070, 460, 60, 60));
     
     lfoDepthSlider.setBounds   (svg (910, 565, 60, 60));
     reverbMixSlider.setBounds  (svg (990, 565, 60, 60));
