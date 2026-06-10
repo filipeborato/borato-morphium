@@ -11,6 +11,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ----------------------------------------------------------------------------
 option(MORPHIUM_FETCH_JUCE "Download JUCE if it is not found locally" OFF)
 option(MORPHIUM_COPY_PLUGIN_AFTER_BUILD "Install the plugin to the system folder after build" OFF)
+option(MORPHIUM_BUILD_CLAP "Build the CLAP plugin through clap-juce-extensions" OFF)
 set(MORPHIUM_JUCE_SOURCE_DIR "" CACHE PATH "Path to a JUCE source checkout")
 
 if(NOT MORPHIUM_JUCE_SOURCE_DIR AND EXISTS "C:/JUCE/CMakeLists.txt")
@@ -83,7 +84,7 @@ juce_add_plugin(BoratoMorphium
     COPY_PLUGIN_AFTER_BUILD ${MORPHIUM_COPY_PLUGIN_AFTER_BUILD}
     PLUGIN_MANUFACTURER_CODE Bora
     PLUGIN_CODE Mph1
-    FORMATS VST3 Standalone
+    FORMATS VST3 AU Standalone
     PRODUCT_NAME "Borato Morphium"
 )
 
@@ -152,4 +153,23 @@ if(MSVC)
     target_compile_options(BoratoMorphium PRIVATE /W4 /permissive- /wd4244 /wd4267)
 else()
     target_compile_options(BoratoMorphium PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# ----------------------------------------------------------------------------
+# CLAP (via clap-juce-extensions). OFF by default for local development;
+# CI enables it with -DMORPHIUM_BUILD_CLAP=ON. Produces BoratoMorphium_CLAP.
+# ----------------------------------------------------------------------------
+if(MORPHIUM_BUILD_CLAP)
+    include(FetchContent)
+    FetchContent_Declare(
+        clap-juce-extensions
+        GIT_REPOSITORY https://github.com/free-audio/clap-juce-extensions.git
+        GIT_TAG main
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(clap-juce-extensions)
+
+    clap_juce_extensions_plugin(TARGET BoratoMorphium
+        CLAP_ID "com.boratoaudio.morphium"
+        CLAP_FEATURES instrument synthesizer stereo)
 endif()

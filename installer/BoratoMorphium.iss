@@ -5,7 +5,11 @@
 ; The installer is written to installer\Output\.
 
 #define MyAppName "Borato Morphium"
-#define MyAppVersion "0.1.0"
+; CI overrides the version with: ISCC.exe /DMyAppVersion=x.y.z (read from the
+; CMake project version). The default below is the local fallback.
+#ifndef MyAppVersion
+  #define MyAppVersion "0.2.0"
+#endif
 #define MyAppPublisher "Borato Company"
 #define MyAppURL "https://borato.audio"
 #define MyAppExeName "Borato Morphium.exe"
