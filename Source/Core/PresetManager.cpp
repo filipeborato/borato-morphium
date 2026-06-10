@@ -1,4 +1,5 @@
 #include "PresetManager.h"
+#include "../Parameters/ParameterIDs.h"
 #include <juce_data_structures/juce_data_structures.h>
 
 namespace morphium
@@ -38,20 +39,20 @@ void PresetManager::loadFactoryPreset(int index)
             param->setValueNotifyingHost(param->convertTo0to1(val));
     };
 
-    setParam("excitation", (float)p.excitation);
-    setParam("density", p.density);
-    setParam("mass", p.mass);
-    setParam("friction", p.friction);
-    setParam("wear", p.wear);
-    setParam("attack", p.attack);
-    setParam("decay", p.decay);
-    setParam("sustain", p.sustain);
-    setParam("release", p.release);
-    setParam("lfoRate", p.lfoRate);
-    setParam("lfoDepth", p.lfoDepth);
-    setParam("reverbSize", p.reverbSize);
-    setParam("reverbMix", p.reverbMix);
-    setParam("resonatorMode", (float)p.resonatorMode);
+    setParam(params::excitationType, (float)p.excitation);
+    setParam(params::density, p.density);
+    setParam(params::mass, p.mass);
+    setParam(params::friction, p.friction);
+    setParam(params::wear, p.wear);
+    setParam(params::attack, p.attack);
+    setParam(params::decay, p.decay);
+    setParam(params::sustain, p.sustain);
+    setParam(params::release, p.release);
+    setParam(params::lfoRate, p.lfoRate);
+    setParam(params::lfoDepth, p.lfoDepth);
+    setParam(params::reverbSize, p.reverbSize);
+    setParam(params::reverbMix, p.reverbMix);
+    setParam(params::resonatorMode, (float)p.resonatorMode);
 }
 
 void PresetManager::saveUserPreset(const juce::String& name)

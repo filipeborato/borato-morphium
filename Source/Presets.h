@@ -6,7 +6,7 @@ namespace morphium
 {
     /**
         A factory preset: a name plus a concrete value for every parameter.
-        Excitation index follows ExcitationType (Bow=0 … Spark=5).
+        Excitation index follows ExcitationType (Strike=0 … TapeLoop=12).
         outputGainDb is in decibels; every other matter/envelope value is the
         parameter's natural range value (seconds for times, 0..1 otherwise).
     */
