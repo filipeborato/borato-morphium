@@ -10,7 +10,8 @@ namespace morphium
 {
 MorphiumAudioProcessor::MorphiumAudioProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts (*this, nullptr, "PARAMETERS", createParameterLayout()),
+      presetManager (apvts)
 {
     wireVoiceParameters();
 
@@ -19,6 +20,9 @@ MorphiumAudioProcessor::MorphiumAudioProcessor()
         synth.addVoice (new MorphiumVoice (voiceParams));
 
     outputGainParam = apvts.getRawParameterValue (params::outputGain);
+    reverbSizeParam = apvts.getRawParameterValue (params::reverbSize);
+    reverbMixParam  = apvts.getRawParameterValue (params::reverbMix);
+    driveParam      = apvts.getRawParameterValue (params::drive);
 }
 
 void MorphiumAudioProcessor::wireVoiceParameters()
@@ -32,6 +36,9 @@ void MorphiumAudioProcessor::wireVoiceParameters()
     voiceParams.decay          = apvts.getRawParameterValue (params::decay);
     voiceParams.sustain        = apvts.getRawParameterValue (params::sustain);
     voiceParams.release        = apvts.getRawParameterValue (params::release);
+    voiceParams.lfoRate        = apvts.getRawParameterValue (params::lfoRate);
+    voiceParams.lfoDepth       = apvts.getRawParameterValue (params::lfoDepth);
+    voiceParams.resonatorMode  = apvts.getRawParameterValue (params::resonatorMode);
 }
 
 void MorphiumAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -41,6 +48,12 @@ void MorphiumAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
     for (int i = 0; i < synth.getNumVoices(); ++i)
         if (auto* voice = dynamic_cast<MorphiumVoice*> (synth.getVoice (i)))
             voice->prepare (sampleRate, samplesPerBlock);
+
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate       = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32> (samplesPerBlock);
+    spec.numChannels      = 2;
+    reverb.prepare (spec);
 
     outputGain.reset (sampleRate, 0.02);
 }
@@ -59,16 +72,44 @@ void MorphiumAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 
     synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
 
+    // Apply Space Reverb prior to output gain
+    if (reverbMixParam != nullptr && reverbSizeParam != nullptr)
+    {
+        juce::dsp::Reverb::Parameters reverbParams;
+        reverbParams.roomSize = reverbSizeParam->load();
+        reverbParams.wetLevel = reverbMixParam->load() * 0.7f; // scale wet for perfect blend
+        reverbParams.dryLevel = 1.0f - reverbParams.wetLevel;
+        reverbParams.damping  = 0.25f;
+        reverbParams.width    = 1.0f;
+        reverb.setParameters (reverbParams);
+
+        juce::dsp::AudioBlock<float> block (buffer);
+        juce::dsp::ProcessContextReplacing<float> context (block);
+        reverb.process (context);
+    }
+
     outputGain.setTargetValue (juce::Decibels::decibelsToGain (outputGainParam->load()));
 
     const int numSamples  = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
 
+    float driveAmt = driveParam != nullptr ? driveParam->load() : 0.0f;
+    float preGain = 1.0f + driveAmt * 10.0f;
+    float postGain = 1.0f / (1.0f + driveAmt * 2.0f);
+
     for (int sample = 0; sample < numSamples; ++sample)
     {
         const float gain = outputGain.getNextValue();
         for (int channel = 0; channel < numChannels; ++channel)
-            buffer.setSample (channel, sample, buffer.getSample (channel, sample) * gain);
+        {
+            float s = buffer.getSample (channel, sample) * gain;
+            
+            // Soft clipping drive
+            if (driveAmt > 0.01f)
+                s = std::tanh (s * preGain) * postGain;
+
+            buffer.setSample (channel, sample, s);
+        }
     }
 }
 
@@ -83,7 +124,8 @@ void MorphiumAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     if (! state.isValid())
         return;
 
-    state.setProperty ("currentProgram", currentProgram, nullptr);
+    state.setProperty ("currentFactoryIndex", presetManager.currentFactoryIndex, nullptr);
+    state.setProperty ("currentUserPresetName", presetManager.currentUserPresetName, nullptr);
 
     if (auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
@@ -96,7 +138,9 @@ void MorphiumAudioProcessor::setStateInformation (const void* data, int sizeInBy
         if (xml->hasTagName (apvts.state.getType()))
         {
             auto tree = juce::ValueTree::fromXml (*xml);
-            currentProgram = (int) tree.getProperty ("currentProgram", 0);
+            presetManager.currentFactoryIndex = (int) tree.getProperty ("currentFactoryIndex", 0);
+            presetManager.currentUserPresetName = tree.getProperty ("currentUserPresetName", "").toString();
+            currentProgram = presetManager.currentFactoryIndex;
             apvts.replaceState (tree);
         }
     }
@@ -125,23 +169,8 @@ void MorphiumAudioProcessor::setParameterValue (const char* id, float value)
 
 void MorphiumAudioProcessor::setCurrentProgram (int index)
 {
-    const auto& presets = getFactoryPresets();
-    if (! juce::isPositiveAndBelow (index, (int) presets.size()))
-        return;
-
-    currentProgram = index;
-    const auto& p = presets[(size_t) index];
-
-    setParameterValue (params::excitationType, (float) p.excitation);
-    setParameterValue (params::density,  p.density);
-    setParameterValue (params::mass,     p.mass);
-    setParameterValue (params::friction, p.friction);
-    setParameterValue (params::wear,     p.wear);
-    setParameterValue (params::attack,   p.attack);
-    setParameterValue (params::decay,    p.decay);
-    setParameterValue (params::sustain,  p.sustain);
-    setParameterValue (params::release,  p.release);
-    setParameterValue (params::outputGain, p.outputGainDb);
+    presetManager.loadFactoryPreset(index);
+    currentProgram = presetManager.currentFactoryIndex;
 
     updateHostDisplay();
 }

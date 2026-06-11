@@ -1,163 +1,280 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760">
   <defs>
+    <!-- Background Space/Brushed Metal Purple -->
     <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#eee8d8"/>
-      <stop offset="1" stop-color="#bdb5a6"/>
+      <stop offset="0" stop-color="#140b24"/>
+      <stop offset="0.5" stop-color="#0a0512"/>
+      <stop offset="1" stop-color="#05010a"/>
     </linearGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.65"/>
-      <stop offset="1" stop-color="#49443d" stop-opacity="0.65"/>
+      <stop offset="0" stop-color="#ff007f"/>
+      <stop offset="0.5" stop-color="#7b00cc"/>
+      <stop offset="1" stop-color="#00f0ff"/>
     </linearGradient>
     <linearGradient id="knob" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#585d5f"/>
-      <stop offset="0.45" stop-color="#2d3032"/>
-      <stop offset="1" stop-color="#101112"/>
+      <stop offset="0" stop-color="#2a153d"/>
+      <stop offset="0.45" stop-color="#150824"/>
+      <stop offset="1" stop-color="#05000a"/>
     </linearGradient>
     <linearGradient id="slot" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#202427"/>
-      <stop offset="1" stop-color="#070808"/>
+      <stop offset="0" stop-color="#0c0014"/>
+      <stop offset="1" stop-color="#030008"/>
     </linearGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#371015"/>
-      <stop offset="1" stop-color="#080203"/>
+    <!-- VFD/Teal Glass for Scope -->
+    <linearGradient id="glassTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#082121"/>
+      <stop offset="1" stop-color="#010505"/>
     </linearGradient>
+    <!-- Hot Pink Glass for Presets -->
+    <linearGradient id="glassPink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b001a"/>
+      <stop offset="1" stop-color="#080005"/>
+    </linearGradient>
+    <!-- Sunset Gradient -->
+    <linearGradient id="sunset" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff007f"/>
+      <stop offset="0.5" stop-color="#ff4b00"/>
+      <stop offset="1" stop-color="#ffb800"/>
+    </linearGradient>
+    <!-- Glowing Filters -->
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.35"/>
+      <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#000" flood-opacity="0.6"/>
     </filter>
-    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+    <filter id="glowPink" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowCyan" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="3" result="g"/>
       <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <style>
-      .brand { font: 800 44px 'Arial Black', Arial, sans-serif; letter-spacing: 8px; fill: #211d18; }
-      .brandHi { font: 800 44px 'Arial Black', Arial, sans-serif; letter-spacing: 8px; fill: #fff7e6; }
-      .sub { font: 700 13px Arial, sans-serif; letter-spacing: 5px; fill: #6b5f4c; }
-      .tag { font: 800 11px Arial, sans-serif; letter-spacing: 3px; fill: #8d6d2d; }
-      .section { font: 700 15px Arial, sans-serif; letter-spacing: 2px; fill: #2e2923; }
-      .small { font: 700 10px Arial, sans-serif; letter-spacing: 1.1px; fill: #4c4439; }
-      .gold { font: 700 10px Arial, sans-serif; letter-spacing: 1.2px; fill: #8d6d2d; }
-      .led { font-family: 'Courier New', monospace; fill: #ff3131; filter: url(#glow); }
-      .line { stroke: #6d6559; stroke-width: 1; opacity: 0.55; }
+      .brand { font: 900 42px 'Impact', 'Arial Black', Arial, sans-serif; letter-spacing: 9px; fill: #ff007f; filter: url(#glowPink); }
+      .brandHi { font: 900 42px 'Impact', 'Arial Black', Arial, sans-serif; letter-spacing: 9px; fill: #00f0ff; filter: url(#glowCyan); }
+      .sub { font: 700 12px 'Arial Black', Arial, sans-serif; letter-spacing: 6px; fill: #00f0ff; }
+      .tag { font: 800 11px Arial, sans-serif; letter-spacing: 3px; fill: #ff007f; }
+      .section { font: 800 15px Arial, sans-serif; letter-spacing: 2px; fill: #00f0ff; filter: url(#glowCyan); }
+      .small { font: 700 10px Arial, sans-serif; letter-spacing: 1.1px; fill: #a291b5; }
+      .cyan-label { font: 800 9px Arial, sans-serif; letter-spacing: 1.2px; fill: #00f0ff; }
+      .pink-label { font: 800 9px Arial, sans-serif; letter-spacing: 1.2px; fill: #ff007f; }
+      .led { font-family: 'Courier New', monospace; fill: #ff007f; filter: url(#glowPink); }
+      .line { stroke: #ff007f; stroke-width: 1.5; opacity: 0.35; }
+      .grid-line { stroke: #411d66; stroke-width: 1; opacity: 0.45; }
     </style>
   </defs>
 
-  <rect width="1280" height="760" fill="#1f1f1d"/>
+  <rect width="1280" height="760" fill="#06020c"/>
 
-  <!-- Chassis -->
+  <!-- Background Wireframe Grid (Synthwave style) -->
+  <g stroke="#ff007f" stroke-width="0.5" opacity="0.08">
+    <path d="M 0,380 L 1280,380 M 0,420 L 1280,420 M 0,460 L 1280,460 M 0,500 L 1280,500 M 0,540 L 1280,540 M 0,580 L 1280,580 M 0,620 L 1280,620 M 0,660 L 1280,660 M 0,700 L 1280,700"/>
+    <path d="M 640,350 L 0,760 M 640,350 L 128,760 M 640,350 L 256,760 M 640,350 L 384,760 M 640,350 L 512,760 M 640,350 L 640,760 M 640,350 L 768,760 M 640,350 L 896,760 M 640,350 L 1024,760 M 640,350 L 1152,760 M 640,350 L 1280,760"/>
+  </g>
+
+  <!-- Chassis Outer Rim with Neon Glow Borders -->
   <g filter="url(#shadow)">
     <rect x="22" y="22" width="1236" height="716" rx="28" fill="url(#rim)"/>
-    <rect x="40" y="40" width="1200" height="680" rx="20" fill="url(#panel)"/>
-    <rect x="58" y="58" width="1164" height="644" rx="12" fill="none" stroke="#fff4dd" stroke-opacity="0.45" stroke-width="2"/>
-    <rect x="64" y="64" width="1152" height="632" rx="10" fill="none" stroke="#302c27" stroke-opacity="0.25" stroke-width="2"/>
+    <rect x="36" y="36" width="1208" height="688" rx="20" fill="url(#panel)"/>
+    <rect x="54" y="54" width="1172" height="652" rx="12" fill="none" stroke="#ff007f" stroke-opacity="0.65" stroke-width="2"/>
+    <rect x="60" y="60" width="1160" height="640" rx="10" fill="none" stroke="#00f0ff" stroke-opacity="0.45" stroke-width="1.5"/>
   </g>
 
-  <!-- Screws -->
-  <g fill="#b8ae9d" stroke="#36312c" stroke-width="2">
-    <circle cx="74" cy="74" r="11"/><circle cx="1206" cy="74" r="11"/>
-    <circle cx="74" cy="686" r="11"/><circle cx="1206" cy="686" r="11"/>
+  <!-- Hexagonal Machine Screws (Retro-Futuristic style) -->
+  <g fill="#1f0f33" stroke="#ff007f" stroke-width="2" stroke-opacity="0.8">
+    <circle cx="74" cy="74" r="10"/><circle cx="1206" cy="74" r="10"/>
+    <circle cx="74" cy="686" r="10"/><circle cx="1206" cy="686" r="10"/>
   </g>
-  <g stroke="#27231f" stroke-width="2" stroke-linecap="round">
-    <line x1="68" y1="72" x2="80" y2="76"/><line x1="1200" y1="79" x2="1212" y2="69"/>
-    <line x1="68" y1="688" x2="80" y2="684"/><line x1="1200" y1="682" x2="1212" y2="690"/>
+  <g stroke="#00f0ff" stroke-width="1.5" stroke-linecap="round" opacity="0.9">
+    <line x1="74" y1="69" x2="74" y2="79"/><line x1="69" y1="74" x2="79" y2="74"/>
+    <line x1="1206" y1="69" x2="1206" y2="79"/><line x1="1201" y1="74" x2="1211" y2="74"/>
+    <line x1="74" y1="681" x2="74" y2="691"/><line x1="69" y1="686" x2="79" y2="686"/>
+    <line x1="1206" y1="681" x2="1206" y2="691"/><line x1="1201" y1="686" x2="1211" y2="686"/>
   </g>
 
-  <!-- Header: engraved wordmark + gold accent -->
-  <text class="brandHi" x="135" y="124">BORATO MORPHIUM</text>
-  <text class="brand"   x="135" y="122">BORATO MORPHIUM</text>
-  <rect x="138" y="138" width="72" height="5" rx="2.5" fill="#8d6d2d"/>
-  <text class="sub" x="216" y="143">SOUND MATTER SYNTHESIZER</text>
-  <text class="tag" x="138" y="170">M-01 · MORPH SERIES</text>
-  <text class="gold" text-anchor="end" x="1145" y="142">CORE → MATTER → MORPH → SPACE</text>
-  <text class="small" text-anchor="end" x="1145" y="164">VST3 / JUCE / BUILD 0.1</text>
+  <!-- 80s Cyber Sunset Logo -->
+  <g transform="translate(90, 75)">
+    <!-- Retro Sun -->
+    <path d="M 0,55 A 40,40 0 1,1 80,55 Z" fill="url(#sunset)" filter="url(#glowPink)"/>
+    <!-- Horizon Stripes -->
+    <rect x="0" y="58" width="80" height="2" fill="#140b24"/>
+    <rect x="0" y="62" width="80" height="3.5" fill="#140b24"/>
+    <rect x="0" y="68" width="80" height="5" fill="#140b24"/>
+    <rect x="0" y="75" width="80" height="7" fill="#140b24"/>
+  </g>
+
+  <!-- Header: Synthwave Wordmark & Glow effects -->
+  <text class="brand" x="195" y="125">BORATO MORPHIUM</text>
+  <rect x="195" y="134" width="120" height="4" rx="2" fill="#ff007f" filter="url(#glowPink)"/>
+  <text class="sub" x="330" y="139">SOUND MATTER SYNTHESIZER</text>
+  <text class="tag" x="195" y="165">M-01 · OUTRUN HYBRID</text>
+  
+  <text class="cyan-label" text-anchor="end" x="1145" y="136">EXCITATION → MATTER RESONATOR → MOTION → SPACE</text>
+  <text class="small" text-anchor="end" x="1145" y="158">NEON RACK / VST3 / BUILD 0.2</text>
 
   <!-- Top Display Row -->
+  <!-- Left Display: Preset screen with Hot Pink Glass -->
   <g transform="translate(135 215)">
-    <rect x="0" y="0" width="420" height="105" rx="10" fill="#3b352f" opacity="0.85"/>
-    <rect x="12" y="12" width="396" height="81" rx="6" fill="url(#glass)" stroke="#090303" stroke-width="4"/>
+    <rect x="0" y="0" width="420" height="105" rx="10" fill="#ff007f" opacity="0.15" stroke="#ff007f" stroke-width="1.5"/>
+    <rect x="12" y="12" width="396" height="81" rx="6" fill="url(#glassPink)" stroke="#ff007f" stroke-width="3.5" filter="url(#glowPink)"/>
   </g>
 
+  <!-- Right Display: Scope screen with VFD/Cyan Glass & grid -->
   <g transform="translate(595 215)">
-    <rect x="0" y="0" width="250" height="105" rx="10" fill="#3b352f" opacity="0.85"/>
-    <rect x="13" y="13" width="224" height="79" rx="6" fill="#101715" stroke="#263b36" stroke-width="4"/>
-    <g stroke="#3f6e61" stroke-width="1" opacity="0.5">
+    <rect x="0" y="0" width="250" height="105" rx="10" fill="#00f0ff" opacity="0.15" stroke="#00f0ff" stroke-width="1.5"/>
+    <rect x="13" y="13" width="224" height="79" rx="6" fill="url(#glassTeal)" stroke="#00f0ff" stroke-width="3.5" filter="url(#glowCyan)"/>
+    <!-- CRT Grid lines -->
+    <g stroke="#00f0ff" stroke-width="0.75" opacity="0.25">
       <line x1="25" y1="38" x2="225" y2="38"/><line x1="25" y1="65" x2="225" y2="65"/>
       <line x1="65" y1="23" x2="65" y2="84"/><line x1="105" y1="23" x2="105" y2="84"/><line x1="145" y1="23" x2="145" y2="84"/><line x1="185" y1="23" x2="185" y2="84"/>
     </g>
   </g>
 
-  <!-- Source buttons -->
+  <!-- Source buttons: Styled as Glowing Neon Selection grid -->
   <g transform="translate(885 215)">
-    <text class="section" x="0" y="-16">SOURCE</text>
+    <text class="section" x="0" y="-14">SOURCE EXCITER</text>
     <g>
-      <rect x="0" y="0" width="78" height="36" rx="6" fill="#202326" stroke="#5f584d" stroke-width="2"/>
-      <rect x="88" y="0" width="78" height="36" rx="6" fill="#202326" stroke="#5f584d" stroke-width="2"/>
-      <rect x="176" y="0" width="78" height="36" rx="6" fill="#202326" stroke="#5f584d" stroke-width="2"/>
-      <text class="small" x="22" y="23" fill="#ddd4bd">BOW</text><text class="small" x="105" y="23" fill="#ddd4bd">STRIKE</text><text class="small" x="199" y="23" fill="#ddd4bd">TAPE</text>
+      <rect x="0" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="88" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="176" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
     </g>
     <g transform="translate(0 48)">
-      <rect x="0" y="0" width="78" height="36" rx="6" fill="#202326" stroke="#5f584d" stroke-width="2"/>
-      <rect x="88" y="0" width="78" height="36" rx="6" fill="#202326" stroke="#5f584d" stroke-width="2"/>
-      <rect x="176" y="0" width="78" height="36" rx="6" fill="#202326" stroke="#5f584d" stroke-width="2"/>
-      <text class="small" x="17" y="23" fill="#ddd4bd">VOICE</text><text class="small" x="106" y="23" fill="#ddd4bd">NOISE</text><text class="small" x="196" y="23" fill="#ddd4bd">SPARK</text>
+      <rect x="0" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="88" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+      <rect x="176" y="0" width="78" height="36" rx="6" fill="#0f051a" stroke="#ff007f" stroke-width="1.5" stroke-opacity="0.8"/>
+    </g>
+    <g transform="translate(0 96)">
+      <!-- Placeholder for ExcitationDisplay LED -->
+      <rect x="0" y="0" width="254" height="26" rx="4" fill="#0d041c" stroke="#00f0ff" stroke-opacity="0.4" stroke-width="1.5"/>
     </g>
   </g>
 
   <line class="line" x1="135" y1="355" x2="1145" y2="355"/>
 
   <!-- Lower grid panels -->
-  <g transform="translate(135 395)">
+  <!-- 1. CORE Section -->
+  <g transform="translate(115 395)">
     <text class="section" x="0" y="0">CORE</text>
-    <text class="gold" x="0" y="20">EXCITATION</text>
-    <g transform="translate(45 95)">
+    <text class="pink-label" x="0" y="20">EXCITATION ENVELOPE</text>
+    <!-- Background Circle bezels styled on panel -->
+    <g transform="translate(64 95)">
+      <!-- Row 1 -->
       <g>
-        <circle r="43" fill="#81796c" opacity="0.45"/><circle r="34" fill="url(#knob)" stroke="#0a0a0a" stroke-width="3"/><line x1="0" y1="0" x2="0" y2="-25" stroke="#f4efe1" stroke-width="4" stroke-linecap="round"/><text class="small" x="-23" y="58">ATTACK</text>
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-20" y="50">ATTACK</text>
       </g>
       <g transform="translate(100 0)">
-        <circle r="43" fill="#81796c" opacity="0.45"/><circle r="34" fill="url(#knob)" stroke="#0a0a0a" stroke-width="3"/><line x1="0" y1="0" x2="18" y2="-18" stroke="#f4efe1" stroke-width="4" stroke-linecap="round"/><text class="small" x="-25" y="58">DECAY</text>
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-17" y="50">DECAY</text>
       </g>
-      <g transform="translate(200 0)">
-        <circle r="43" fill="#81796c" opacity="0.45"/><circle r="34" fill="url(#knob)" stroke="#0a0a0a" stroke-width="3"/><line x1="0" y1="0" x2="-18" y2="-18" stroke="#f4efe1" stroke-width="4" stroke-linecap="round"/><text class="small" x="-24" y="58">SUSTAIN</text>
+      <!-- Row 2 -->
+      <g transform="translate(0 105)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="50">SUSTAIN</text>
+      </g>
+      <g transform="translate(100 105)">
+        <circle r="34" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="50">RELEASE</text>
       </g>
     </g>
   </g>
 
-  <g transform="translate(445 395)">
+  <!-- 2. MATTER Section (Faders + Resonator Selector) -->
+  <g transform="translate(375 395)">
     <text class="section" x="0" y="0">MATTER</text>
-    <text class="gold" x="0" y="20">MASS · FRICTION · WEAR</text>
-    <g transform="translate(20 55)">
+    <text class="pink-label" x="0" y="20">MODAL RESONATOR &amp; SHAPING</text>
+    
+    <!-- Resonator Model Buttons: OFF, METAL, GLASS, WOOD -->
+    <!-- Center-aligned perfectly above the 4 Matter faders -->
+    <g transform="translate(32 35)">
+      <!-- OFF (centered at x = 22) -->
+      <rect x="-4" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="22" y="13" text-anchor="middle" font-size="8">OFF</text>
+      
+      <!-- METAL (centered at x = 86) -->
+      <rect x="60" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="86" y="13" text-anchor="middle" font-size="8">METAL</text>
+
+      <!-- GLASS (centered at x = 150) -->
+      <rect x="124" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="150" y="13" text-anchor="middle" font-size="8">GLASS</text>
+
+      <!-- WOOD (centered at x = 214) -->
+      <rect x="188" y="0" width="52" height="20" rx="4" fill="#0c0217" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+      <text class="cyan-label" x="214" y="13" text-anchor="middle" font-size="8">WOOD</text>
+    </g>
+
+    <!-- Faders Slots -->
+    <g transform="translate(32 55)">
       <g>
-        <rect width="44" height="150" rx="7" fill="url(#slot)"/><line x1="22" y1="18" x2="22" y2="132" stroke="#6e6559" stroke-width="3"/><text class="small" x="-6" y="175">DENS</text>
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="8" y="174">DENS</text>
       </g>
       <g transform="translate(64 0)">
-        <rect width="44" height="150" rx="7" fill="url(#slot)"/><line x1="22" y1="18" x2="22" y2="132" stroke="#6e6559" stroke-width="3"/><text class="small" x="2" y="175">MASS</text>
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="8" y="174">MASS</text>
       </g>
       <g transform="translate(128 0)">
-        <rect width="44" height="150" rx="7" fill="url(#slot)"/><line x1="22" y1="18" x2="22" y2="132" stroke="#6e6559" stroke-width="3"/><text class="small" x="-5" y="175">FRICT</text>
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="5" y="174">FRICT</text>
       </g>
       <g transform="translate(192 0)">
-        <rect width="44" height="150" rx="7" fill="url(#slot)"/><line x1="22" y1="18" x2="22" y2="132" stroke="#6e6559" stroke-width="3"/><text class="small" x="4" y="175">WEAR</text>
+        <rect width="44" height="150" rx="7" fill="url(#slot)" stroke="#ff007f" stroke-opacity="0.25"/>
+        <line x1="22" y1="18" x2="22" y2="132" stroke="#4a1a6b" stroke-width="3"/>
+        <text class="cyan-label" x="8" y="174">WEAR</text>
       </g>
     </g>
   </g>
 
-  <g transform="translate(725 395)">
-    <text class="section" x="0" y="0">BORATO MACRO</text>
-    <text class="gold" x="0" y="20">MORPH ENGINE</text>
+  <!-- 3. BORATO MACRO Hero morph knob -->
+  <g transform="translate(675 395)">
+    <text class="section" x="117" y="0" text-anchor="middle">BORATO MACRO</text>
+    <text class="pink-label" x="117" y="20" text-anchor="middle">MORPH MATRIX ENGINE</text>
+  </g>
+  <g transform="translate(732 635)">
+    <!-- Placeholder for MacroDisplay LED -->
+    <rect x="0" y="0" width="120" height="22" rx="4" fill="#0d041c" stroke="#00f0ff" stroke-opacity="0.4" stroke-width="1.5"/>
   </g>
 
-  <g transform="translate(970 395)">
-    <text class="section" x="0" y="0">MOTION / SPACE</text>
-    <text class="gold" x="0" y="20">RELEASE · OUTPUT</text>
-    <g transform="translate(35 92)">
-      <g>
-        <circle r="38" fill="#81796c" opacity="0.45"/><circle r="30" fill="url(#knob)" stroke="#0a0a0a" stroke-width="3"/><line x1="0" y1="0" x2="-12" y2="-20" stroke="#f4efe1" stroke-width="4" stroke-linecap="round"/><text class="small" x="-23" y="54">RELEASE</text>
+  <!-- 4. MOTION / SPACE Grid Knobs (LFO, Reverb, Release, Output) -->
+  <g transform="translate(910 395)">
+    <text class="section" x="0" y="0">MOTION &amp; SPACE</text>
+    <text class="pink-label" x="10" y="20">MODULATION · REVERB · CONTROL</text>
+    <!-- Background Circle bezels in a 3x2 Grid on panel -->
+    <!-- Row centers y=490/595 match the CORE (ADSR) rows: 105 apart -->
+    <g transform="translate(30 95)">
+      <!-- Row 1: LFO Rate, Reverb Size, Release -->
+      <g transform="translate(0, 0)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-26" y="44">LFO RATE</text>
       </g>
-      <g transform="translate(95 0)">
-        <circle r="38" fill="#81796c" opacity="0.45"/><circle r="30" fill="url(#knob)" stroke="#0a0a0a" stroke-width="3"/><line x1="0" y1="0" x2="16" y2="-17" stroke="#f4efe1" stroke-width="4" stroke-linecap="round"/><text class="small" x="-25" y="54">OUTPUT</text>
+      <g transform="translate(80, 0)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-26" y="44">REV SIZE</text>
+      </g>
+      <g transform="translate(160, 0)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-17" y="44">DRIVE</text>
+      </g>
+      <!-- Row 2: LFO Depth, Reverb Mix, Output -->
+      <g transform="translate(0, 105)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-26" y="44">LFO DPTH</text>
+      </g>
+      <g transform="translate(80, 105)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-23" y="44">REV MIX</text>
+      </g>
+      <g transform="translate(160, 105)">
+        <circle r="30" fill="#0d041c" stroke="#ff007f" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="cyan-label" x="-20" y="44">OUTPUT</text>
       </g>
     </g>
   </g>
 
-  <text class="small" x="135" y="685">BORATO COMPANY · CURITIBA · SOUND MATTER ENGINE</text>
-  <text class="small" text-anchor="end" x="1145" y="685">CORE → MATTER → OUTPUT</text>
+  <!-- Footers -->
+  <text class="small" x="135" y="685">BORATO COMPANY · CURITIBA · NEON CYBERPUNK LABS</text>
+  <text class="cyan-label" text-anchor="end" x="1145" y="685">OUTRUN SYNTHWAVE DESIGN SYSTEM</text>
 </svg>

@@ -38,6 +38,8 @@ void BasicMatterProcessor::reset()
 {
     lowpass.reset();
     highpass.reset();
+    for (auto& r : resonators)
+        r.reset();
     dampState = 0.0f;
     lastLowpassHz = lastHighpassHz = -1.0f;
 }
@@ -48,6 +50,12 @@ void BasicMatterProcessor::setParameters (float density, float mass, float frict
     massSm.setTargetValue     (juce::jlimit (0.0f, 1.0f, mass));
     frictionSm.setTargetValue (juce::jlimit (0.0f, 1.0f, friction));
     wearSm.setTargetValue     (juce::jlimit (0.0f, 1.0f, wear));
+}
+
+void BasicMatterProcessor::setResonatorParameters (int mode, float baseFreq) noexcept
+{
+    resonatorMode = mode;
+    baseFreqHz = baseFreq;
 }
 
 float BasicMatterProcessor::processSample (float input) noexcept
@@ -83,6 +91,41 @@ float BasicMatterProcessor::processSample (float input) noexcept
     // Wear: amplitude instability + a little high-frequency damping.
     const float noise = random.nextFloat() * 2.0f - 1.0f;
     x *= (1.0f - wear * 0.5f * std::abs (noise));
+
+    // Modal Resonator Bank (METAL / GLASS / WOOD)
+    if (resonatorMode > 0)
+    {
+        std::array<float, numModes> ratios { 1.0f, 2.0f, 3.0f, 4.0f };
+        float baseQ = 50.0f;
+
+        if (resonatorMode == 1) // METAL
+        {
+            ratios = { 1.0f, 1.62f, 2.31f, 3.75f };
+            baseQ = 220.0f * (1.0f - wear * 0.75f);
+        }
+        else if (resonatorMode == 2) // GLASS
+        {
+            ratios = { 1.0f, 2.0f, 3.14f, 4.07f };
+            baseQ = 400.0f * (1.0f - wear * 0.85f);
+        }
+        else if (resonatorMode == 3) // WOOD
+        {
+            ratios = { 1.0f, 1.46f, 1.98f, 2.65f };
+            baseQ = 30.0f * (1.0f - wear * 0.60f);
+        }
+
+        float resonatorSum = 0.0f;
+        for (int i = 0; i < numModes; ++i)
+        {
+            const float f = clampCutoff (baseFreqHz * ratios[(size_t) i], sampleRate);
+            const float q = juce::jmax (2.0f, baseQ * (1.0f - (float) i * 0.15f));
+            resonators[(size_t) i].updateCoefficients (f, q, sampleRate);
+            resonatorSum += resonators[(size_t) i].process (x);
+        }
+
+        // Blend resonance back into physical body
+        x = x * 0.40f + resonatorSum * 0.60f;
+    }
 
     const float dampCoeff = juce::jmap (wear, 1.0f, 0.25f); // worn = more damped
     dampState += (x - dampState) * dampCoeff;

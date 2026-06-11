@@ -1,0 +1,568 @@
+name: Build Release Artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - release
+      - "release/**"
+      - "ci/**"
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# The product version lives in exactly one place: the `project(... VERSION ...)`
+# line in CMakeLists.txt. Each job reads it at runtime into MORPHIUM_VERSION
+# (via GITHUB_ENV), so bumping the release is a one-line change in CMakeLists.txt
+# and every artifact name / release asset follows automatically.
+
+jobs:
+  build-windows:
+    name: Windows x64 Release
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version from CMakeLists.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver=$(sed -nE 's/^[[:space:]]*project\(BoratoMorphium[[:space:]]+VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          test -n "$ver"
+          echo "Resolved Borato Morphium version: $ver"
+          echo "MORPHIUM_VERSION=$ver" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -G "Visual Studio 17 2022" -A x64
+          -DMORPHIUM_FETCH_JUCE=ON
+          -DMORPHIUM_BUILD_CLAP=ON
+          -DMORPHIUM_COPY_PLUGIN_AFTER_BUILD=OFF
+
+      - name: Build Release
+        run: >
+          cmake --build build --config Release
+          --target BoratoMorphium_VST3 BoratoMorphium_Standalone BoratoMorphium_CLAP
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "/DMyAppVersion=$env:MORPHIUM_VERSION" installer\BoratoMorphium.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Package artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $root = "build\BoratoMorphium_artefacts\Release"
+          $dist = "dist"
+          New-Item -ItemType Directory -Force $dist | Out-Null
+
+          $base = "BoratoMorphium-v$env:MORPHIUM_VERSION-Windows-x64"
+
+          # VST3 is a bundle folder; keep the parent so the zip extracts as
+          # "Borato Morphium.vst3/...".
+          Compress-Archive -Path "$root\VST3\Borato Morphium.vst3" `
+                           -DestinationPath "$dist\$base-VST3.zip"
+          Compress-Archive -Path "$root\Standalone\Borato Morphium.exe" `
+                           -DestinationPath "$dist\$base-Standalone.zip"
+          Compress-Archive -Path "$root\CLAP\Borato Morphium.clap" `
+                           -DestinationPath "$dist\$base-CLAP.zip"
+
+          Copy-Item "installer\Output\BoratoMorphium-$env:MORPHIUM_VERSION-Setup.exe" `
+                    "$dist\$base-Setup.exe"
+
+          @"
+          # Borato Morphium Windows install (x64)
+
+          The artifacts are unsigned development builds. The Standalone is built
+          with ASIO support (JUCE 8 bundled ASIO header).
+
+          ## Installer (recommended)
+
+          Run ``$base-Setup.exe``. It installs the VST3 to
+          ``C:\Program Files\Common Files\VST3\`` and the Standalone to
+          ``C:\Program Files\Borato Company\Borato Morphium\`` with a Start Menu
+          shortcut and an uninstaller. Components are individually selectable.
+
+          ## Manual VST3
+
+          Unzip ``$base-VST3.zip`` and copy ``Borato Morphium.vst3`` to:
+
+          ``C:\Program Files\Common Files\VST3\``
+
+          ## Manual CLAP
+
+          Unzip ``$base-CLAP.zip`` and copy ``Borato Morphium.clap`` to:
+
+          ``C:\Program Files\Common Files\CLAP\``
+
+          ## Manual Standalone
+
+          Unzip ``$base-Standalone.zip`` and run ``Borato Morphium.exe`` from
+          any folder.
+          "@ | Out-File -Encoding utf8 "$dist\INSTALL-Windows-x64.md"
+
+          Get-ChildItem $dist
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-VST3
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-VST3.zip
+          if-no-files-found: error
+
+      - name: Upload CLAP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-CLAP
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-CLAP.zip
+          if-no-files-found: error
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-Standalone
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-Standalone.zip
+          if-no-files-found: error
+
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-Setup
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-Setup.exe
+          if-no-files-found: error
+
+      - name: Upload install notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-install-notes
+          path: dist/INSTALL-Windows-x64.md
+          if-no-files-found: error
+
+      - name: Upload release bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-release-assets
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attach assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-VST3.zip
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-CLAP.zip
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-Standalone.zip
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Windows-x64-Setup.exe
+            dist/INSTALL-Windows-x64.md
+
+  build-macos:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Each slice is validated on a NATIVE runner so auval loads the
+          # component without Rosetta. Apple Silicon first shipped on macOS 11,
+          # so 11.0 is the justified minimum for the arm64 slice.
+          - name: macOS arm64 Release
+            runs_on: macos-15
+            architecture: arm64
+            artifact_suffix: macOS-arm64
+            deployment_target: "11.0"
+          # Intel slice on a native Intel runner; 10.15 (Catalina) is a safe min.
+          - name: macOS Intel Release
+            runs_on: macos-15-intel
+            architecture: x86_64
+            artifact_suffix: macOS-intel
+            deployment_target: "10.15"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version from CMakeLists.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver=$(sed -nE 's/^[[:space:]]*project\(BoratoMorphium[[:space:]]+VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          test -n "$ver"
+          echo "Resolved Borato Morphium version: $ver"
+          echo "MORPHIUM_VERSION=$ver" >> "$GITHUB_ENV"
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -G Xcode
+          -DMORPHIUM_FETCH_JUCE=ON
+          -DMORPHIUM_BUILD_CLAP=ON
+          -DMORPHIUM_COPY_PLUGIN_AFTER_BUILD=OFF
+          -DCMAKE_OSX_ARCHITECTURES=${{ matrix.architecture }}
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY=""
+
+      - name: Build Release
+        run: cmake --build build --config Release
+
+      - name: Sign and validate Audio Unit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          au="build/BoratoMorphium_artefacts/Release/AU/Borato Morphium.component"
+          test -d "$au"
+
+          # Ad-hoc sign the component in place. Because we sign the bundle that
+          # lives in the build tree, both the copy we install for auval AND the
+          # copy we zip below are the exact same signed/validated bundle.
+          codesign --force --deep --sign - "$au"
+          codesign --verify --deep --strict --verbose=2 "$au"
+
+          # Install into the per-user Components path so auval can discover it.
+          components="$HOME/Library/Audio/Plug-Ins/Components"
+          mkdir -p "$components"
+          rm -rf "$components/Borato Morphium.component"
+          cp -R "$au" "$components/"
+
+          installed="$components/Borato Morphium.component"
+
+          # Clear quarantine and the AU registration cache so a fresh scan runs.
+          xattr -dr com.apple.quarantine "$installed" || true
+          killall -9 AudioComponentRegistrar >/dev/null 2>&1 || true
+          rm -f "$HOME/Library/Caches/AudioUnitCache/com.apple.audiounits.cache" || true
+
+          # Make the validated slice (arm64 / x86_64) obvious in the log.
+          file "$installed/Contents/MacOS/"*
+
+          # Best-effort listing of our components; never fails the job.
+          auval -a | grep -i Borato || true
+
+          # Mandatory validation. Codes come from juce_add_plugin():
+          # IS_SYNTH -> aumu, PLUGIN_CODE = Mph1, MANUFACTURER_CODE = Bora.
+          # With `set -e`, a non-zero auval exit fails the whole workflow.
+          auval -v aumu Mph1 Bora
+
+      - name: Package artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          artifact_root="build/BoratoMorphium_artefacts/Release"
+          dist="dist"
+          artifact_suffix="${{ matrix.artifact_suffix }}"
+          architecture="${{ matrix.architecture }}"
+          mkdir -p "$dist"
+
+          vst3="$artifact_root/VST3/Borato Morphium.vst3"
+          au="$artifact_root/AU/Borato Morphium.component"
+          clap="$artifact_root/CLAP/Borato Morphium.clap"
+          standalone="$artifact_root/Standalone/Borato Morphium.app"
+
+          test -d "$vst3"
+          test -d "$au"
+          test -d "$clap"
+          test -d "$standalone"
+
+          base="BoratoMorphium-v${MORPHIUM_VERSION}-${artifact_suffix}"
+
+          # NOTE: the AU is zipped from the same on-disk bundle that was signed
+          # and validated in the previous step.
+          ditto -c -k --keepParent "$vst3" "$dist/${base}-VST3.zip"
+          ditto -c -k --keepParent "$au" "$dist/${base}-AU.zip"
+          ditto -c -k --keepParent "$clap" "$dist/${base}-CLAP.zip"
+          ditto -c -k --keepParent "$standalone" "$dist/${base}-Standalone.zip"
+
+          cat > "$dist/INSTALL-${artifact_suffix}.md" <<'EOF'
+          # Borato Morphium macOS install (@ARCH@)
+
+          The Audio Unit in this bundle is ad-hoc signed and was validated in CI
+          with `auval -v aumu Mph1 Bora`. The VST3/CLAP/Standalone artifacts are
+          unsigned development builds.
+
+          ## VST3
+
+          Unzip `BoratoMorphium-v@VER@-@SUFFIX@-VST3.zip` and copy `Borato Morphium.vst3` to:
+
+          ```text
+          ~/Library/Audio/Plug-Ins/VST3/
+          ```
+
+          ## AU
+
+          Unzip `BoratoMorphium-v@VER@-@SUFFIX@-AU.zip` and copy `Borato Morphium.component` to:
+
+          ```text
+          ~/Library/Audio/Plug-Ins/Components/
+          ```
+
+          You can re-validate locally with:
+
+          ```bash
+          auval -v aumu Mph1 Bora
+          ```
+
+          ## CLAP
+
+          Unzip `BoratoMorphium-v@VER@-@SUFFIX@-CLAP.zip` and copy `Borato Morphium.clap` to:
+
+          ```text
+          ~/Library/Audio/Plug-Ins/CLAP/
+          ```
+
+          ## Standalone
+
+          Unzip `BoratoMorphium-v@VER@-@SUFFIX@-Standalone.zip` and move `Borato Morphium.app` to `/Applications` or any local folder.
+
+          ## Gatekeeper note
+
+          The unsigned artifacts may be blocked by macOS the first time. If needed, remove quarantine after unzipping:
+
+          ```bash
+          xattr -dr com.apple.quarantine "Borato Morphium.vst3"
+          xattr -dr com.apple.quarantine "Borato Morphium.component"
+          xattr -dr com.apple.quarantine "Borato Morphium.clap"
+          xattr -dr com.apple.quarantine "Borato Morphium.app"
+          ```
+          EOF
+
+          # Fill in placeholders (kept out of the quoted heredoc so the markdown
+          # code fences survive verbatim).
+          sed -i '' \
+            -e "s/@VER@/${MORPHIUM_VERSION}/g" \
+            -e "s/@SUFFIX@/${artifact_suffix}/g" \
+            -e "s/@ARCH@/${architecture}/g" \
+            "$dist/INSTALL-${artifact_suffix}.md"
+
+          ls -la "$dist"
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-VST3
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-VST3.zip
+          if-no-files-found: error
+
+      - name: Upload AU
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-AU
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-AU.zip
+          if-no-files-found: error
+
+      - name: Upload CLAP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-CLAP
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-CLAP.zip
+          if-no-files-found: error
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-Standalone
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-Standalone.zip
+          if-no-files-found: error
+
+      - name: Upload install notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-install-notes
+          path: dist/INSTALL-${{ matrix.artifact_suffix }}.md
+          if-no-files-found: error
+
+      - name: Upload release bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-release-assets
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attach assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-VST3.zip
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-AU.zip
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-CLAP.zip
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-${{ matrix.artifact_suffix }}-Standalone.zip
+            dist/INSTALL-${{ matrix.artifact_suffix }}.md
+
+  build-ubuntu:
+    name: Ubuntu Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version from CMakeLists.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver=$(sed -nE 's/^[[:space:]]*project\(BoratoMorphium[[:space:]]+VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          test -n "$ver"
+          echo "Resolved Borato Morphium version: $ver"
+          echo "MORPHIUM_VERSION=$ver" >> "$GITHUB_ENV"
+
+      - name: Install JUCE Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libfreetype6-dev \
+            libfontconfig1-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxrender-dev
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DMORPHIUM_FETCH_JUCE=ON
+          -DMORPHIUM_BUILD_CLAP=ON
+          -DMORPHIUM_COPY_PLUGIN_AFTER_BUILD=OFF
+
+      - name: Build Release
+        run: cmake --build build
+
+      - name: Package artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          artifact_root="build/BoratoMorphium_artefacts/Release"
+          dist="dist"
+          mkdir -p "$dist"
+
+          vst3="$artifact_root/VST3/Borato Morphium.vst3"
+          clap="$artifact_root/CLAP/Borato Morphium.clap"
+          standalone="$artifact_root/Standalone/Borato Morphium"
+
+          test -d "$vst3"
+          test -f "$clap"
+          test -f "$standalone"
+
+          base="BoratoMorphium-v${MORPHIUM_VERSION}-Ubuntu"
+
+          tar -czf "$dist/${base}-VST3.tar.gz" -C "$artifact_root/VST3" "Borato Morphium.vst3"
+          tar -czf "$dist/${base}-CLAP.tar.gz" -C "$artifact_root/CLAP" "Borato Morphium.clap"
+          tar -czf "$dist/${base}-Standalone.tar.gz" -C "$artifact_root/Standalone" "Borato Morphium"
+
+          cat > "$dist/INSTALL-Ubuntu.md" <<'EOF'
+          # Borato Morphium Ubuntu install
+
+          These artifacts are unsigned development builds.
+
+          ## VST3
+
+          Extract `BoratoMorphium-v@VER@-Ubuntu-VST3.tar.gz` and copy `Borato Morphium.vst3` to:
+
+          ```text
+          ~/.vst3/
+          ```
+
+          ## CLAP
+
+          Extract `BoratoMorphium-v@VER@-Ubuntu-CLAP.tar.gz` and copy `Borato Morphium.clap` to:
+
+          ```text
+          ~/.clap/
+          ```
+
+          Then rescan plugins in your DAW.
+
+          ## Standalone
+
+          Extract `BoratoMorphium-v@VER@-Ubuntu-Standalone.tar.gz`, mark the app executable, and run it:
+
+          ```bash
+          chmod +x "Borato Morphium"
+          ./"Borato Morphium"
+          ```
+          EOF
+
+          sed -i -e "s/@VER@/${MORPHIUM_VERSION}/g" "$dist/INSTALL-Ubuntu.md"
+
+          ls -la "$dist"
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-VST3
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-VST3.tar.gz
+          if-no-files-found: error
+
+      - name: Upload CLAP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-CLAP
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-CLAP.tar.gz
+          if-no-files-found: error
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-Standalone
+          path: dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-Standalone.tar.gz
+          if-no-files-found: error
+
+      - name: Upload install notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-install-notes
+          path: dist/INSTALL-Ubuntu.md
+          if-no-files-found: error
+
+      - name: Upload release bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-release-assets
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attach assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-VST3.tar.gz
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-CLAP.tar.gz
+            dist/BoratoMorphium-v${{ env.MORPHIUM_VERSION }}-Ubuntu-Standalone.tar.gz
+            dist/INSTALL-Ubuntu.md

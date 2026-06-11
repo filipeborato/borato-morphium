@@ -55,11 +55,33 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
                                        timeRange (8.0f), 0.400f,
                                        Attr().withLabel ("s")));
 
+    // --- Motion (LFO) -------------------------------------------------------
+    juce::NormalisableRange<float> rateRange { 0.05f, 20.0f, 0.01f };
+    rateRange.setSkewForCentre (1.5f);
+    layout.add (std::make_unique<APF> (makeID (params::lfoRate), "LFO Rate", rateRange, 1.0f, Attr().withLabel ("Hz")));
+    layout.add (std::make_unique<APF> (makeID (params::lfoDepth), "LFO Depth", unit, 0.20f));
+
+    // --- Space & Color (Reverb, Drive) --------------------------------------
+    layout.add (std::make_unique<APF> (makeID (params::reverbSize), "Reverb Size", unit, 0.60f));
+    layout.add (std::make_unique<APF> (makeID (params::reverbMix), "Reverb Mix", unit, 0.25f));
+    layout.add (std::make_unique<APF> (makeID (params::drive), "Drive", unit, 0.0f));
+
+    // --- Resonator Model ----------------------------------------------------
+    layout.add (std::make_unique<APC> (makeID (params::resonatorMode),
+                                       "Resonator Model",
+                                       juce::StringArray { "OFF", "METAL", "GLASS", "WOOD" },
+                                       0));
+
     // --- Output -------------------------------------------------------------
     layout.add (std::make_unique<APF> (makeID (params::outputGain), "Output",
                                        juce::NormalisableRange<float> { -60.0f, 6.0f, 0.1f },
                                        -6.0f,
                                        Attr().withLabel ("dB")));
+
+    // --- Macro --------------------------------------------------------------
+    layout.add (std::make_unique<APF> (makeID (params::macroAmount), "Macro Amount", unit, 0.50f));
+    layout.add (std::make_unique<APC> (makeID (params::macroMode), "Macro Mode",
+                                       juce::StringArray { "MATTER", "SPACE", "PUNCH", "CHAOS", "FREEZE", "PULSAR", "LOFI", "RESONANCE" }, 0));
 
     return layout;
 }

@@ -21,7 +21,14 @@ namespace
 
 juce::StringArray getExcitationTypeNames()
 {
-    return { "Bow", "Strike", "Tape", "Voice", "Noise", "Spark" };
+    return {
+        "STRIKE", "IMPULSE", "PIZZICATO",
+        "BOW", "SCRAPE",
+        "VOICE", "BREATH",
+        "SPARK", "SINE", "WAVETABLE",
+        "NOISE",
+        "TAPE", "TAPE LOOP"
+    };
 }
 
 ExcitationCore::ExcitationCore() = default;
@@ -108,12 +115,25 @@ float ExcitationCore::processSample() noexcept
 {
     switch (type)
     {
-        case ExcitationType::Bow:    return renderBow();
-        case ExcitationType::Strike: return renderStrike();
-        case ExcitationType::Tape:   return renderTape();
-        case ExcitationType::Voice:  return renderVoice();
-        case ExcitationType::Noise:  return renderNoise();
-        case ExcitationType::Spark:  return renderSpark();
+        // IMPACT
+        case ExcitationType::Strike:
+        case ExcitationType::Impulse:
+        case ExcitationType::Pizzicato: return renderStrike();
+        // FRICTION
+        case ExcitationType::Bow:
+        case ExcitationType::Scrape:    return renderBow();
+        // AIR
+        case ExcitationType::Voice:
+        case ExcitationType::Breath:    return renderVoice();
+        // SYNTH
+        case ExcitationType::Spark:
+        case ExcitationType::Sine:
+        case ExcitationType::Wavetable: return renderSpark();
+        // NOISE
+        case ExcitationType::Noise:     return renderNoise();
+        // TAPE
+        case ExcitationType::Tape:
+        case ExcitationType::TapeLoop:  return renderTape();
         case ExcitationType::NumTypes:
         default:                     return 0.0f;
     }

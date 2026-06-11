@@ -14,12 +14,19 @@ namespace morphium
     */
     enum class ExcitationType
     {
-        Bow,    // continuously driven tone with slow instability
-        Strike, // short impulse exciting a tonal decay
-        Tape,   // oscillator with wow/flutter and light saturation
-        Voice,  // source shaped by formant-like band-passes
-        Noise,  // band-limited noise tuned to the note
-        Spark,  // short noisy burst with a bright tonal ping
+        // IMPACT
+        Strike, Impulse, Pizzicato,
+        // FRICTION
+        Bow, Scrape,
+        // AIR
+        Voice, Breath,
+        // SYNTH
+        Spark, Sine, Wavetable,
+        // NOISE
+        Noise,
+        // TAPE
+        Tape, TapeLoop,
+        
         NumTypes
     };
 
