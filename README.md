@@ -1,6 +1,7 @@
 # Borato Morphium
 
 **Sound Matter Synthesizer** — an experimental VST3 synth built on JUCE.
+<img width="1451" height="860" alt="Captura de tela 2026-06-10 212748" src="https://github.com/user-attachments/assets/ecb40888-8e0c-4828-89a9-f85aa67a441a" />
 
 Instead of picking a waveform, you pick a *source of sonic energy* (Bow, Strike,
 Tape, Voice, Noise, Spark), then shape it as physical **matter** (density, mass,
