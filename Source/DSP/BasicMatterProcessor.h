@@ -2,26 +2,22 @@
 
 #include <juce_dsp/juce_dsp.h>
 
+#include <array>
+
 namespace morphium
 {
     /**
-        Shapes the raw excitation into "matter".
-
-        The four controls are deliberately physical rather than electronic, so
-        that later we can swap this for real material models (Tape, Metal,
-        Glass, Circuit, Concrete) behind the same interface.
+        A single 2-pole resonator (one vibrational mode of the material).
+        Coefficients are computed outside the audio loop — see
+        BasicMatterProcessor::updateModalCoefficients().
     */
     struct ModalResonator
     {
         float y1 = 0.0f, y2 = 0.0f;
-        float freq = 1000.0f;
-        float q = 100.0f;
         float b1 = 0.0f, b2 = 0.0f, a = 0.0f;
 
         void updateCoefficients (float f, float Q, double sampleRate) noexcept
         {
-            freq = f;
-            q = Q;
             const float theta = juce::MathConstants<float>::twoPi * f / static_cast<float> (sampleRate);
             const float r = std::exp (-theta / (2.0f * Q));
             b1 = -2.0f * r * std::cos (theta);
@@ -44,19 +40,25 @@ namespace morphium
     };
 
     /**
-        Shapes the raw excitation into "matter" and adds Modal Resonance.
+        Shapes the raw excitation into "matter": an 8-mode modal resonator bank
+        with per-material mode tables (frequency ratio, gain, T60), driven by
+        four physical controls:
 
-        The four controls are deliberately physical rather than electronic, so
-        that later we can swap this for real material models (Tape, Metal,
-        Glass, Circuit, Concrete) behind the same interface:
+          - density  : low-end body (high-pass) + modal inharmonicity spread
+                       (less dense matter -> modes drift apart, more metallic)
+          - mass     : darkness (low-pass) + spectral tilt of the mode gains
+                       (massive matter -> low modes dominate)
+          - friction : exciter saturation drive + nonlinearity of the
+                       resonant body itself (loud rings distort)
+          - wear     : material ageing — modal T60 loss, slow random mode
+                       detune, occasional soft mode dropouts (never noise)
 
-          - density  : body / low-end presence (high-pass opening up)
-          - mass     : weight / darkness (low-pass closing down)
-          - friction : saturation drive
-          - wear     : amplitude instability and high-frequency damping
+        Materials: 0=OFF, 1=METAL, 2=GLASS, 3=WOOD, 4=TAPE, 5=CIRCUIT,
+        6=CONCRETE.
 
-        Real-time contract: prepare() allocates; setParameters() and
-        processSample() are allocation-free.
+        Real-time contract: prepare() allocates; everything else is
+        allocation-free. Modal coefficients are recomputed at control rate
+        (every 256 samples) or when the note/model changes, never per sample.
     */
     class BasicMatterProcessor
     {
@@ -69,12 +71,23 @@ namespace morphium
         /** Sets the smoothed targets. Values are expected in [0, 1]. */
         void setParameters (float density, float mass, float friction, float wear) noexcept;
 
-        /** Sets the resonator model (0=OFF, 1=METAL, 2=GLASS, 3=WOOD) and base fundamental frequency. */
+        /** Sets the resonator material (see class comment) and base
+            fundamental frequency. Recomputes the modal coefficients when
+            either actually changed — call freely at block rate. */
         void setResonatorParameters (int mode, float baseFreq) noexcept;
+
+        /** Test hook: reseeds the internal RNG so offline renders are deterministic. */
+        void setSeed (juce::int64 seed) noexcept { random.setSeed (seed); }
 
         float processSample (float input) noexcept;
 
+        static constexpr int numModes = 8;
+        static constexpr int numMaterials = 6;   // excluding OFF
+
     private:
+        void updateModalCoefficients() noexcept;
+        void updateControlRateModulation (float wear) noexcept;
+
         double sampleRate = 44100.0;
 
         juce::dsp::StateVariableTPTFilter<float> lowpass;   // mass
@@ -86,11 +99,26 @@ namespace morphium
         float lastLowpassHz  = -1.0f;
         float lastHighpassHz = -1.0f;
 
-        // Modal Resonator Bank
-        static constexpr int numModes = 4;
+        // DC blocker after the saturation stage (tanh of asymmetric waveforms
+        // such as the Tape saw otherwise leaves an audible DC offset).
+        float dcR = 0.999f;
+        float dcX1 = 0.0f, dcY1 = 0.0f;
+
+        // Modal resonator bank.
         std::array<ModalResonator, numModes> resonators;
-        int resonatorMode = 0;
+        std::array<float, numModes> modeGain {};      // table gain x mass tilt
+        int   resonatorMode = 0;
         float baseFreqHz = 440.0f;
+        int   lastMode = -1;
+        float lastBaseFreqHz = -1.0f;
+
+        // Control-rate modulation state, updated every controlPeriod samples.
+        static constexpr int controlPeriod = 256;
+        int controlCounter = 0;
+        std::array<float, numModes> detuneState {};   // semitone offsets
+        std::array<float, numModes> detuneTarget {};
+        std::array<float, numModes> gateState;        // 1 = mode audible
+        std::array<float, numModes> gateTarget;
 
         float dampState = 0.0f;
         juce::Random random;

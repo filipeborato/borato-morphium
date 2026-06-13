@@ -13,6 +13,9 @@ namespace morphium::params
     // Core
     inline constexpr auto excitationType = "excitationType";
 
+    // Wavetable scan position (0..1) for the WAVE * shapes in the SYNTH family.
+    inline constexpr auto wavePosition = "wavePosition";
+
     // Matter
     inline constexpr auto density  = "density";
     inline constexpr auto mass     = "mass";
@@ -36,6 +39,9 @@ namespace morphium::params
 
     // Matter Resonator Model
     inline constexpr auto resonatorMode = "resonatorMode";
+
+    // Primary resonator (Karplus-Strong waveguide) dry/wet
+    inline constexpr auto waveguideBlend = "waveguideBlend";
 
     // Output
     inline constexpr auto outputGain = "outputGain";

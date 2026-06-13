@@ -21,19 +21,31 @@ cmake --build build --config Release --target BoratoMorphium_Standalone   # fast
 
 Artifacts land in `build/BoratoMorphium_artefacts/Release/{VST3,Standalone}/`. `-DMORPHIUM_COPY_PLUGIN_AFTER_BUILD=ON` auto-installs the VST3 to the system folder.
 
+Offline DSP tests (Catch2 + CTest):
+
+```powershell
+cmake -B build -G "Visual Studio 18 2026" -A x64 -DMORPHIUM_BUILD_TESTS=ON
+cmake --build build --config Debug --target MorphiumTests
+ctest --test-dir build -C Debug --output-on-failure
+```
+
 Windows installer (after a Release build of both targets):
 
 ```powershell
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\BoratoMorphium.iss
 ```
 
+Output lands in `installer/Output/BoratoMorphium-<version>-Setup.exe`.
+
 When releasing, bump the version in `CMakeLists.txt` (`project(... VERSION)`) — CI reads it from there and also injects it into the Inno Setup script (whose `#define MyAppVersion` is only a local fallback).
 
 ## CI (GitHub Actions)
 
-`.github/workflows/build-release-artifacts.yml` builds on every push to `main`/`release`/`ci/**` and on `v*` tags: Windows x64 (VST3 + Standalone + CLAP + Inno Setup installer), macOS arm64 + Intel (VST3 + AU + CLAP + Standalone, with mandatory `auval -v aumu Mph1 Bora`), and Ubuntu (VST3 + CLAP + Standalone). Tag pushes attach all artifacts to a draft GitHub Release. CLAP is built via clap-juce-extensions, enabled with `-DMORPHIUM_BUILD_CLAP=ON` (OFF by default locally).
+`.github/workflows/build-release-artifacts.yml` builds on pushes to `main`/`release`/`release/**`/`ci/**`, on PRs to `main`, on `v*` tags, and on manual dispatch: Windows x64 (VST3 + Standalone + CLAP + Inno Setup installer), macOS arm64 + Intel (VST3 + AU + CLAP + Standalone, with mandatory `auval -v aumu Mph1 Bora`), and Ubuntu (VST3 + CLAP + Standalone + `MorphiumTests`). Tag pushes attach all artifacts to a draft GitHub Release. CLAP is built via clap-juce-extensions, enabled with `-DMORPHIUM_BUILD_CLAP=ON` (OFF by default locally).
 
-There are no automated tests; verification is building the Standalone and playing it.
+The Windows job is pinned to the `windows-2022` runner with the "Visual Studio 17 2022" generator (newer runner images broke the build) — don't assume CI has the same VS version as the local machine.
+
+Ubuntu CI enables `-DMORPHIUM_BUILD_TESTS=ON` and runs `ctest` through `xvfb-run` because the headless test executable still initialises JUCE's MessageManager.
 
 Note: `BoratoMorphium.jucer` (Projucer) mirrors the CMake project, but **CMake is the primary, reproducible build**. New source files must be added to `target_sources` in `CMakeLists.txt` (and ideally to the `.jucer` to keep the mirror in sync).
 

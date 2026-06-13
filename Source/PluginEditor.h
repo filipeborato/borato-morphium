@@ -102,6 +102,19 @@ namespace morphium
         void paint (juce::Graphics&) override;
     };
 
+    /**
+        A tiny cyan rotary that sits over the scope: the WAVE knob, scanning the
+        wavetable morph frames. Custom-drawn in the scope's cyan so it reads as
+        part of the CRT rather than a panel knob.
+    */
+    class WaveKnob : public juce::Slider
+    {
+    public:
+        WaveKnob() : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag,
+                                   juce::Slider::NoTextBox) {}
+        void paint (juce::Graphics&) override;
+    };
+
     class MorphiumAudioProcessorEditor : public juce::AudioProcessorEditor,
                                          private juce::Timer
     {
@@ -111,6 +124,11 @@ namespace morphium
 
         void paint (juce::Graphics&) override;
         void resized() override;
+
+        // Panic affordances: Esc (or double-clicking the chassis) hard-stops
+        // every voice — a safety net for notes left stuck by a lost note-off.
+        bool keyPressed (const juce::KeyPress&) override;
+        void mouseDoubleClick (const juce::MouseEvent&) override;
 
     private:
         using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
@@ -134,6 +152,8 @@ namespace morphium
 
         PresetDisplay presetDisplay;
         WaveDisplay waveDisplay;
+        WaveKnob waveKnob;                       // WAVE: wavetable scan position
+        std::unique_ptr<SliderAttachment> waveKnobAtt;
         float wavePhase = 0.0f;
 
         static constexpr int numSources = 6;

@@ -27,7 +27,7 @@ namespace morphium
         bool acceptsMidi() const override  { return true; }
         bool producesMidi() const override { return false; }
         bool isMidiEffect() const override { return false; }
-        double getTailLengthSeconds() const override { return 0.0; }
+        double getTailLengthSeconds() const override { return 8.0; }
 
         int getNumPrograms() override;
         int getCurrentProgram() override { return currentProgram; }
@@ -40,6 +40,18 @@ namespace morphium
 
         juce::AudioProcessorValueTreeState& getValueTreeState() { return apvts; }
         morphium::PresetManager presetManager;
+
+        /** Test hook: seeds every voice's RNG so offline renders are reproducible. */
+        void setDeterministicSeedForTests (juce::int64 baseSeed);
+
+        /** Test hook: number of voices currently sounding a note. */
+        int countActiveVoicesForTests() const;
+
+        /** Panic: immediately silence every voice and clear the reverb tail.
+            Safe to call from the message thread — the request is serviced at the
+            top of the next processBlock. Clears notes left stuck by a lost
+            note-off (e.g. a Standalone keyboard key released off-focus). */
+        void panic() noexcept { panicRequested.store (true); }
 
     private:
         static constexpr int numVoices = 8;
@@ -55,6 +67,16 @@ namespace morphium
         std::atomic<float>* driveParam      = nullptr;
 
         juce::dsp::Reverb reverb;
+
+        // Set from the message thread (panic()); serviced on the audio thread.
+        std::atomic<bool> panicRequested { false };
+
+        // 2x oversampling for the output drive stage: tanh at 44.1 kHz folds
+        // its upper harmonics back as inharmonic junk; at 2x they land above
+        // the audible band and are filtered out on the way down.
+        juce::dsp::Oversampling<float> driveOversampling {
+            2, 1, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true
+        };
 
         int currentProgram = 0;
 

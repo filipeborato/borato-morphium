@@ -39,6 +39,24 @@ void MorphiumAudioProcessor::wireVoiceParameters()
     voiceParams.lfoRate        = apvts.getRawParameterValue (params::lfoRate);
     voiceParams.lfoDepth       = apvts.getRawParameterValue (params::lfoDepth);
     voiceParams.resonatorMode  = apvts.getRawParameterValue (params::resonatorMode);
+    voiceParams.waveguideBlend = apvts.getRawParameterValue (params::waveguideBlend);
+    voiceParams.wavePosition   = apvts.getRawParameterValue (params::wavePosition);
+}
+
+void MorphiumAudioProcessor::setDeterministicSeedForTests (juce::int64 baseSeed)
+{
+    for (int i = 0; i < synth.getNumVoices(); ++i)
+        if (auto* voice = dynamic_cast<MorphiumVoice*> (synth.getVoice (i)))
+            voice->setSeed (baseSeed + i);
+}
+
+int MorphiumAudioProcessor::countActiveVoicesForTests() const
+{
+    int count = 0;
+    for (int i = 0; i < synth.getNumVoices(); ++i)
+        if (synth.getVoice (i)->isVoiceActive())
+            ++count;
+    return count;
 }
 
 void MorphiumAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -52,8 +70,11 @@ void MorphiumAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
     juce::dsp::ProcessSpec spec;
     spec.sampleRate       = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32> (samplesPerBlock);
-    spec.numChannels      = 2;
+    spec.numChannels      = static_cast<juce::uint32> (juce::jmax (1, getTotalNumOutputChannels()));
     reverb.prepare (spec);
+
+    driveOversampling.reset();
+    driveOversampling.initProcessing (static_cast<size_t> (samplesPerBlock));
 
     outputGain.reset (sampleRate, 0.02);
 }
@@ -68,18 +89,47 @@ void MorphiumAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 {
     juce::ScopedNoDenormals noDenormals;
 
+    // Panic: hard-stop every voice and flush the reverb before this block.
+    if (panicRequested.exchange (false))
+    {
+        synth.allNotesOff (0, false);
+        reverb.reset();
+    }
+
     buffer.clear();
 
     synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
 
+    // Headroom normalisation: full chords must not slam the reverb and drive.
+    buffer.applyGain (1.0f / std::sqrt ((float) numVoices));
+
     // Apply Space Reverb prior to output gain
     if (reverbMixParam != nullptr && reverbSizeParam != nullptr)
     {
+        // The matter colours its space: each material biases the reverb's
+        // damping, and wear erodes the room's brightness further.
+        static constexpr float materialDampingBias[] = {
+            0.0f,   // OFF
+            0.05f,  // METAL    — reverberant, bright tank
+            0.10f,  // GLASS    — clear chamber
+            0.40f,  // WOOD     — warm, absorptive room
+            0.60f,  // TAPE     — muffled, magnetic
+            0.20f,  // CIRCUIT  — electronic, medium
+            0.30f,  // CONCRETE — dense, dark
+        };
+        const int material = juce::jlimit (0, 6,
+            (int) voiceParams.resonatorMode->load());
+        const float wear = voiceParams.wear->load();
+
         juce::dsp::Reverb::Parameters reverbParams;
-        reverbParams.roomSize = reverbSizeParam->load();
+        // Freeverb's comb feedback reaches 0.98 at roomSize 1.0, which lets a
+        // sustained tone build up ~50x (+34 dB). Cap the room so the biggest
+        // space stays bounded (~0.946 feedback, +25 dB worst case).
+        reverbParams.roomSize = reverbSizeParam->load() * 0.88f;
         reverbParams.wetLevel = reverbMixParam->load() * 0.7f; // scale wet for perfect blend
         reverbParams.dryLevel = 1.0f - reverbParams.wetLevel;
-        reverbParams.damping  = 0.25f;
+        reverbParams.damping  = juce::jlimit (0.0f, 1.0f,
+            0.25f + materialDampingBias[material] * wear);
         reverbParams.width    = 1.0f;
         reverb.setParameters (reverbParams);
 
@@ -89,26 +139,43 @@ void MorphiumAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     }
 
     outputGain.setTargetValue (juce::Decibels::decibelsToGain (outputGainParam->load()));
+    outputGain.applyGain (buffer, buffer.getNumSamples());
 
-    const int numSamples  = buffer.getNumSamples();
-    const int numChannels = buffer.getNumChannels();
-
-    float driveAmt = driveParam != nullptr ? driveParam->load() : 0.0f;
-    float preGain = 1.0f + driveAmt * 10.0f;
-    float postGain = 1.0f / (1.0f + driveAmt * 2.0f);
-
-    for (int sample = 0; sample < numSamples; ++sample)
+    // Soft-clipping drive, processed at 2x to keep the tanh harmonics from
+    // aliasing back into the audible band.
+    const float driveAmt = driveParam != nullptr ? driveParam->load() : 0.0f;
+    if (driveAmt > 0.01f)
     {
-        const float gain = outputGain.getNextValue();
-        for (int channel = 0; channel < numChannels; ++channel)
-        {
-            float s = buffer.getSample (channel, sample) * gain;
-            
-            // Soft clipping drive
-            if (driveAmt > 0.01f)
-                s = std::tanh (s * preGain) * postGain;
+        const float preGain  = 1.0f + driveAmt * 10.0f;
+        const float postGain = 1.0f / (1.0f + driveAmt * 2.0f);
 
-            buffer.setSample (channel, sample, s);
+        juce::dsp::AudioBlock<float> block (buffer);
+        auto upBlock = driveOversampling.processSamplesUp (block);
+
+        for (size_t channel = 0; channel < upBlock.getNumChannels(); ++channel)
+        {
+            float* data = upBlock.getChannelPointer (channel);
+            for (size_t i = 0; i < upBlock.getNumSamples(); ++i)
+                data[i] = std::tanh (data[i] * preGain) * postGain;
+        }
+
+        driveOversampling.processSamplesDown (block);
+    }
+
+    // Master safety clip: unity below the knee, then a smooth tanh shoulder
+    // bounded at 1.0. Extreme patches (huge reverb + heavy friction drones)
+    // can otherwise build up well past 0 dBFS.
+    constexpr float knee = 0.85f;
+    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+    {
+        float* data = buffer.getWritePointer (channel);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            const float magnitude = std::abs (data[i]);
+            if (magnitude > knee)
+                data[i] = std::copysign (knee + (1.0f - knee)
+                              * std::tanh ((magnitude - knee) / (1.0f - knee)),
+                          data[i]);
         }
     }
 }
