@@ -38,6 +38,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     // --- Matter -------------------------------------------------------------
     const auto unit = juce::NormalisableRange<float> { 0.0f, 1.0f, 0.0001f };
 
+    // Wavetable scan position (centre of the frame morph). Default mid-table.
+    layout.add (std::make_unique<APF> (makeID (params::wavePosition), "Wave", unit, 0.50f));
+
     layout.add (std::make_unique<APF> (makeID (params::density),  "Density",  unit, 0.50f));
     layout.add (std::make_unique<APF> (makeID (params::mass),     "Mass",     unit, 0.50f));
     layout.add (std::make_unique<APF> (makeID (params::friction), "Friction", unit, 0.30f));
@@ -69,8 +72,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     // --- Resonator Model ----------------------------------------------------
     layout.add (std::make_unique<APC> (makeID (params::resonatorMode),
                                        "Resonator Model",
-                                       juce::StringArray { "OFF", "METAL", "GLASS", "WOOD" },
+                                       juce::StringArray { "OFF", "METAL", "GLASS", "WOOD",
+                                                           "TAPE", "CIRCUIT", "CONCRETE" },
                                        0));
+
+    // --- Primary resonator (waveguide) ---------------------------------------
+    // 0 = legacy oscillator path; 1 = excitation fully drives the string model.
+    layout.add (std::make_unique<APF> (makeID (params::waveguideBlend),
+                                       "Waveguide", unit, 0.0f));
 
     // --- Output -------------------------------------------------------------
     layout.add (std::make_unique<APF> (makeID (params::outputGain), "Output",

@@ -404,6 +404,7 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     : AudioProcessorEditor (&p), processorRef (p)
 {
     setLookAndFeel (&lookAndFeel);
+    setWantsKeyboardFocus (true);   // so Esc reaches keyPressed() for panic
 
     panel = juce::Drawable::createFromImageData (BinaryData::morphium_panel_svg,
                                                  BinaryData::morphium_panel_svgSize);
@@ -419,6 +420,15 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     // --- Waveform scope -----------------------------------------------------
     waveDisplay.setSource (apvts.getRawParameterValue (params::excitationType));
     addAndMakeVisible (waveDisplay);
+
+    // WAVE knob over the scope: scans the wavetable morph frames (added after the
+    // scope so it draws on top). Only shown for wavetable sources — see the
+    // excitation attachment below, which toggles its visibility.
+    waveKnob.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    waveKnob.setTooltip ("WAVE - wavetable scan position");
+    addChildComponent (waveKnob);   // hidden until a wavetable source is selected
+    waveKnobAtt = std::make_unique<SliderAttachment> (apvts, params::wavePosition, waveKnob);
+
     startTimerHz (30);  // animate the scope + keep the preset display in sync
 
     // --- Excitation source (the six SOURCE category buttons) ----------------
@@ -464,7 +474,11 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
 
                 for (int i = 0; i < numSources; ++i)
                     sourceButtons[(size_t) i].setSelectedState (i == category);
-                    
+
+                // The WAVE scan knob only does something for wavetable sources,
+                // so only show it then (no dead knob on Strike/Bow/Tape/...).
+                waveKnob.setVisible (morphium::isWavetableType (index));
+
                 juce::String name = morphium::getExcitationTypeNames()[index];
                 excitationDisplay.setContent(-1, "SRC: " + name);
             });
@@ -498,7 +512,9 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
             *resonatorParam,
             [this] (float value)
             {
-                const int index = juce::jlimit (0, numResonatorModes - 1, juce::roundToInt (value));
+                // Materials beyond the four panel slots (TAPE/CIRCUIT/CONCRETE,
+                // reachable via presets or host automation) light no button.
+                const int index = juce::roundToInt (value);
                 for (int i = 0; i < numResonatorModes; ++i)
                     resonatorButtons[(size_t) i].setSelectedState (i == index);
             });
@@ -677,6 +693,41 @@ juce::Rectangle<int> MorphiumAudioProcessorEditor::svg (float x, float y, float 
                                  juce::roundToInt (w * scale), juce::roundToInt (h * scale));
 }
 
+void WaveKnob::paint (juce::Graphics& g)
+{
+    auto b = getLocalBounds().toFloat().reduced (1.5f);
+    const float cx = b.getCentreX();
+    const float cy = b.getCentreY();
+    const float r  = juce::jmin (b.getWidth(), b.getHeight()) * 0.5f;
+
+    const juce::Colour cyan { 0xff00f0ff };
+
+    // Recessed dark disc so the cyan reads cleanly over the CRT trace.
+    g.setColour (juce::Colour { 0xcc0d011c });
+    g.fillEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f);
+    g.setColour (cyan.withAlpha (0.45f));
+    g.drawEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f, 1.0f);
+
+    const auto  rp   = getRotaryParameters();
+    const float prop = (float) valueToProportionOfLength (getValue());
+    const float ang  = rp.startAngleRadians + prop * (rp.endAngleRadians - rp.startAngleRadians);
+    const float ar   = r - 2.5f;
+
+    // Value arc (clockwise from the start angle).
+    juce::Path arc;
+    arc.addCentredArc (cx, cy, ar, ar, 0.0f, rp.startAngleRadians, ang, true);
+    g.setColour (cyan);
+    g.strokePath (arc, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
+                                             juce::PathStrokeType::rounded));
+
+    // Pointer (angle measured clockwise from 12 o'clock).
+    const float px = cx + ar * std::sin (ang);
+    const float py = cy - ar * std::cos (ang);
+    g.setColour (cyan);
+    g.drawLine (cx, cy, px, py, 1.6f);
+    g.fillEllipse (px - 1.8f, py - 1.8f, 3.6f, 3.6f);
+}
+
 void MorphiumAudioProcessorEditor::configureRotary (juce::Slider& s)
 {
     s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
@@ -689,6 +740,23 @@ void MorphiumAudioProcessorEditor::configureVertical (juce::Slider& s)
     s.setSliderStyle (juce::Slider::LinearVertical);
     s.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible (s);
+}
+
+bool MorphiumAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
+{
+    // Esc = panic. Bubbles up from any focused knob, so it works even mid-drag.
+    if (key == juce::KeyPress::escapeKey)
+    {
+        processorRef.panic();
+        return true;
+    }
+    return false;
+}
+
+void MorphiumAudioProcessorEditor::mouseDoubleClick (const juce::MouseEvent&)
+{
+    // Double-clicking the chassis (not a control) is a mouse-reachable panic.
+    processorRef.panic();
 }
 
 void MorphiumAudioProcessorEditor::paint (juce::Graphics& g)
@@ -709,6 +777,9 @@ void MorphiumAudioProcessorEditor::resized()
 
     // Scope, over the right "glass" screen (SVG inner glass at 608,228).
     waveDisplay.setBounds (svg (608, 228, 224, 79));
+
+    // WAVE knob: a tiny rotary tucked into the scope's top-right corner.
+    waveKnob.setBounds (svg (800, 231, 30, 30));
 
     // SOURCE block (top right): two rows of three buttons.
     // Base (885,215); each button 78x36, 88 apart horizontally, rows 48 apart.

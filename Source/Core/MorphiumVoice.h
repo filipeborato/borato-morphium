@@ -4,6 +4,7 @@
 
 #include "ExcitationCore.h"
 #include "../DSP/BasicMatterProcessor.h"
+#include "../DSP/WaveguideResonator.h"
 
 namespace morphium
 {
@@ -26,6 +27,8 @@ namespace morphium
         std::atomic<float>* lfoRate        = nullptr;
         std::atomic<float>* lfoDepth       = nullptr;
         std::atomic<float>* resonatorMode  = nullptr;
+        std::atomic<float>* waveguideBlend = nullptr;
+        std::atomic<float>* wavePosition   = nullptr;
     };
 
     /**
@@ -51,12 +54,21 @@ namespace morphium
         void renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
                               int startSample, int numSamples) override;
 
+        /** Test hook: makes the voice's random behaviour deterministic. */
+        void setSeed (juce::int64 seed) noexcept
+        {
+            excitation.setSeed (seed);
+            matter.setSeed (seed + 0x9E3779B9);
+        }
+
     private:
         void updateParametersFromState() noexcept;
 
         const VoiceParameters& params;
 
         ExcitationCore       excitation;
+        WaveguideResonator   waveguide;
+        WaveguideResonator   sympatheticWaveguide;
         BasicMatterProcessor matter;
         juce::ADSR           adsr;
         juce::ADSR::Parameters adsrParams;
@@ -64,6 +76,16 @@ namespace morphium
         juce::SmoothedValue<float> level;   // velocity, smoothed to avoid clicks
         bool isPrepared = false;
 
+        // LFO targets are recomputed at control rate so the matter stage's
+        // 20 ms parameter smoothers do the per-sample interpolation.
+        static constexpr int controlRatePeriod = 64;
+        int controlCounter = 0;
+
+        // After the release ends the resonators keep ringing; the voice is
+        // freed once the output has stayed silent for this many samples.
+        int silentSamples = 0;
+
+        float sympatheticKick = 0.0f;
         float lfoPhase = 0.0f;
         float currentFrequency = 440.0f;
     };

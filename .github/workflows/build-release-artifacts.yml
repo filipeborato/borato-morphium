@@ -447,7 +447,8 @@ jobs:
             libxext-dev \
             libxinerama-dev \
             libxrandr-dev \
-            libxrender-dev
+            libxrender-dev \
+            xvfb
 
       - name: Configure
         run: >
@@ -456,10 +457,17 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DMORPHIUM_FETCH_JUCE=ON
           -DMORPHIUM_BUILD_CLAP=ON
+          -DMORPHIUM_BUILD_TESTS=ON
           -DMORPHIUM_COPY_PLUGIN_AFTER_BUILD=OFF
 
       - name: Build Release
         run: cmake --build build
+
+      - name: Run offline DSP tests
+        run: >
+          xvfb-run --auto-servernum
+          --server-args="-screen 0 1280x1024x24"
+          ctest --test-dir build --output-on-failure
 
       - name: Package artifacts
         shell: bash

@@ -53,6 +53,8 @@ void PresetManager::loadFactoryPreset(int index)
     setParam(params::reverbSize, p.reverbSize);
     setParam(params::reverbMix, p.reverbMix);
     setParam(params::resonatorMode, (float)p.resonatorMode);
+    setParam(params::waveguideBlend, p.waveguide);
+    setParam(params::wavePosition, p.wavePos);
 }
 
 void PresetManager::saveUserPreset(const juce::String& name)

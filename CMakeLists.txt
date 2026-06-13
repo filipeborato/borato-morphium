@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(BoratoMorphium VERSION 0.2.0 LANGUAGES C CXX)
+project(BoratoMorphium VERSION 0.3.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(MORPHIUM_FETCH_JUCE "Download JUCE if it is not found locally" OFF)
 option(MORPHIUM_COPY_PLUGIN_AFTER_BUILD "Install the plugin to the system folder after build" OFF)
 option(MORPHIUM_BUILD_CLAP "Build the CLAP plugin through clap-juce-extensions" OFF)
+option(MORPHIUM_BUILD_TESTS "Build the offline spectral test suite (Catch2 + CTest)" OFF)
 set(MORPHIUM_JUCE_SOURCE_DIR "" CACHE PATH "Path to a JUCE source checkout")
 
 if(NOT MORPHIUM_JUCE_SOURCE_DIR AND EXISTS "C:/JUCE/CMakeLists.txt")
@@ -116,6 +117,9 @@ target_sources(BoratoMorphium
         Source/Core/ExcitationCore.h
         Source/DSP/BasicMatterProcessor.cpp
         Source/DSP/BasicMatterProcessor.h
+        Source/DSP/PolyBlep.h
+        Source/DSP/WaveguideResonator.cpp
+        Source/DSP/WaveguideResonator.h
         Source/UI/MorphiumLookAndFeel.cpp
         Source/UI/MorphiumLookAndFeel.h
 )
@@ -159,6 +163,83 @@ endif()
 # CLAP (via clap-juce-extensions). OFF by default for local development;
 # CI enables it with -DMORPHIUM_BUILD_CLAP=ON. Produces BoratoMorphium_CLAP.
 # ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# Offline spectral test suite. A JUCE console app that recompiles the plugin
+# sources (they use per-module includes and no JucePlugin_* macros, so they
+# build cleanly outside juce_add_plugin) and drives MorphiumAudioProcessor
+# headlessly: render MIDI offline, FFT the output, assert on the spectrum.
+# ----------------------------------------------------------------------------
+if(MORPHIUM_BUILD_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.5.4
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+
+    juce_add_console_app(MorphiumTests PRODUCT_NAME "MorphiumTests")
+
+    target_sources(MorphiumTests
+        PRIVATE
+            tests/main.cpp
+            tests/SpectralUtils.cpp
+            tests/SpectralUtils.h
+            tests/test_excitation.cpp
+            tests/test_matter.cpp
+            tests/test_voice.cpp
+            tests/test_waveguide.cpp
+            tests/test_presets.cpp
+            tests/test_integration.cpp
+            Source/PluginProcessor.cpp
+            Source/PluginEditor.cpp
+            Source/Parameters/ParameterLayout.cpp
+            Source/Core/PresetManager.cpp
+            Source/Core/MorphiumVoice.cpp
+            Source/Core/ExcitationCore.cpp
+            Source/DSP/BasicMatterProcessor.cpp
+            Source/DSP/WaveguideResonator.cpp
+            Source/UI/MorphiumLookAndFeel.cpp
+    )
+
+    target_include_directories(MorphiumTests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    )
+
+    target_link_libraries(MorphiumTests
+        PRIVATE
+            juce::juce_audio_utils
+            juce::juce_dsp
+            MorphiumAssets
+            Catch2::Catch2
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_warning_flags
+    )
+
+    target_compile_definitions(MorphiumTests
+        PRIVATE
+            JUCE_WEB_BROWSER=0
+            JUCE_USE_CURL=0
+            JUCE_MODAL_LOOPS_PERMITTED=0
+            # Lets the tests locate tests/golden and tests/artifacts from any CWD.
+            MORPHIUM_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests"
+    )
+
+    if(MSVC)
+        target_compile_options(MorphiumTests PRIVATE /W4 /permissive- /wd4244 /wd4267)
+    endif()
+
+    enable_testing()
+    list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
+    include(Catch)
+    # The test executable initialises JUCE's MessageManager. On Linux that can
+    # need X11, so defer Catch2 discovery to ctest where CI wraps it in Xvfb.
+    catch_discover_tests(MorphiumTests DISCOVERY_MODE PRE_TEST)
+endif()
+
 if(MORPHIUM_BUILD_CLAP)
     include(FetchContent)
     FetchContent_Declare(

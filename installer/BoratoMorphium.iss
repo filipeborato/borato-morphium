@@ -8,7 +8,7 @@
 ; CI overrides the version with: ISCC.exe /DMyAppVersion=x.y.z (read from the
 ; CMake project version). The default below is the local fallback.
 #ifndef MyAppVersion
-  #define MyAppVersion "0.2.0"
+  #define MyAppVersion "0.3.0"
 #endif
 #define MyAppPublisher "Borato Company"
 #define MyAppURL "https://borato.audio"
