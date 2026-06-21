@@ -525,7 +525,7 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     setLookAndFeel (&lookAndFeel);
     setWantsKeyboardFocus (true);   // so Esc reaches keyPressed() for panic
 
-    juce::String svgText (BinaryData::morphium_panel_svg, BinaryData::morphium_panel_svgSize);
+    juce::String svgText = juce::String::fromUTF8 (BinaryData::morphium_panel_svg, BinaryData::morphium_panel_svgSize);
     svgText = svgText.replace ("BUILD_VERSION_PLACEHOLDER", "v" + juce::String (MORPHIUM_VERSION));
  
     std::unique_ptr<juce::XmlElement> xml (juce::XmlDocument::parse (svgText));
