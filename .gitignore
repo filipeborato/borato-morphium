@@ -20,3 +20,5 @@ Thumbs.db
 
 # --- Local tool settings ---
 .claude/settings.local.json
+.antigravitycli/
+.mimocode/

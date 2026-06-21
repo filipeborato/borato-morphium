@@ -3,6 +3,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <array>
+#include <atomic>
+
 #include "Core/MorphiumVoice.h"
 #include "Core/PresetManager.h"
 
@@ -40,6 +43,16 @@ namespace morphium
 
         juce::AudioProcessorValueTreeState& getValueTreeState() { return apvts; }
         morphium::PresetManager presetManager;
+
+        // Scope buffer: the audio thread writes the latest output samples here;
+        // the editor reads them at 30 Hz for the oscilloscope display.
+        static constexpr int scopeBufferSize = 512;
+        std::array<float, scopeBufferSize> scopeBuffer {};
+        std::atomic<int> scopeWritePos { 0 };
+
+        // Peak levels for the output meter (updated per processBlock).
+        std::atomic<float> peakLeft { 0.0f };
+        std::atomic<float> peakRight { 0.0f };
 
         /** Test hook: seeds every voice's RNG so offline renders are reproducible. */
         void setDeterministicSeedForTests (juce::int64 baseSeed);

@@ -99,4 +99,16 @@ void PresetManager::deleteUserPreset(const juce::String& name)
         file.deleteFile();
 }
 
+void PresetManager::renameUserPreset(const juce::String& oldName, const juce::String& newName)
+{
+    auto oldFile = defaultDirectory.getChildFile(oldName + ".xml");
+    auto newFile = defaultDirectory.getChildFile(newName + ".xml");
+    if (oldFile.existsAsFile() && !newFile.existsAsFile())
+    {
+        oldFile.moveFileTo(newFile);
+        if (currentUserPresetName == oldName)
+            currentUserPresetName = newName;
+    }
+}
+
 }

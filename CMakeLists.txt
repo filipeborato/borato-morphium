@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(BoratoMorphium VERSION 0.3.0 LANGUAGES C CXX)
+project(BoratoMorphium VERSION 0.4.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -144,6 +144,7 @@ target_compile_definitions(BoratoMorphium
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+        MORPHIUM_VERSION="${PROJECT_VERSION}"
 )
 
 # ASIO low-latency audio for the Standalone (Windows). JUCE 8 ships a bundled
@@ -224,6 +225,7 @@ if(MORPHIUM_BUILD_TESTS)
             JUCE_WEB_BROWSER=0
             JUCE_USE_CURL=0
             JUCE_MODAL_LOOPS_PERMITTED=0
+            MORPHIUM_VERSION="${PROJECT_VERSION}"
             # Lets the tests locate tests/golden and tests/artifacts from any CWD.
             MORPHIUM_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests"
     )

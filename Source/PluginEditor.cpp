@@ -3,6 +3,10 @@
 #include "BinaryData.h"
 #include "Parameters/ParameterIDs.h"
 
+#ifndef MORPHIUM_VERSION
+#define MORPHIUM_VERSION "0.4.0"
+#endif
+
 namespace morphium
 {
 namespace
@@ -93,6 +97,16 @@ namespace
     }
 }
 
+int MorphiumAudioProcessorEditor::excitationFamily (int index) noexcept
+{
+    if      (index >= 11) return 5;   // 11..17 -> TAPE
+    else if (index >= 10) return 4;   // 10     -> NOISE
+    else if (index >= 7)  return 3;   // 7..9   -> SYNTH
+    else if (index >= 5)  return 2;   // 5..6   -> AIR
+    else if (index >= 3)  return 1;   // 3..4   -> FRICTION
+    else                  return 0;   // 0..2   -> IMPACT
+}
+
 void MorphiumAudioProcessorEditor::applyMacro (float amount, int mode)
 {
     auto set = [this] (const char* id, float value)
@@ -155,42 +169,119 @@ void MorphiumAudioProcessorEditor::applyMacro (float amount, int mode)
     }
 }
 
+void MorphiumAudioProcessorEditor::updateMacroHighlight (int mode)
+{
+    macroAffectedSliders.clear();
+
+    auto addIf = [this] (juce::Slider* s) { macroAffectedSliders.push_back (s); };
+
+    switch (mode)
+    {
+        case 0: // MATTER
+            addIf (&densitySlider); addIf (&massSlider); addIf (&frictionSlider); addIf (&wearSlider);
+            break;
+        case 1: // SPACE
+            addIf (&reverbSizeSlider); addIf (&reverbMixSlider); addIf (&lfoRateSlider); addIf (&releaseSlider);
+            break;
+        case 2: // PUNCH
+            addIf (&attackSlider); addIf (&sustainSlider); addIf (&densitySlider);
+            break;
+        case 3: // CHAOS
+            addIf (&wearSlider); addIf (&frictionSlider); addIf (&lfoDepthSlider); addIf (&lfoRateSlider);
+            break;
+        case 4: // FREEZE
+            addIf (&decaySlider); addIf (&sustainSlider); addIf (&reverbMixSlider); addIf (&attackSlider);
+            break;
+        case 5: // PULSAR
+            addIf (&lfoRateSlider); addIf (&lfoDepthSlider); addIf (&wearSlider);
+            break;
+        case 6: // LOFI
+            addIf (&densitySlider); addIf (&massSlider); addIf (&wearSlider); addIf (&frictionSlider);
+            break;
+        case 7: // RESONANCE
+            addIf (&frictionSlider); addIf (&massSlider); addIf (&densitySlider); addIf (&reverbSizeSlider);
+            break;
+    }
+
+    macroHighlightFrames = macroHighlightDuration;
+    repaint();
+}
+
 void WaveDisplay::paint (juce::Graphics& g)
 {
     const auto area = getLocalBounds().toFloat().reduced (getWidth() * 0.03f, getHeight() * 0.12f);
-
-    // The parameter holds 13 excitation types; fold the index into its SOURCE
-    // family so the scope draws one wave per family (same grouping as the
-    // category buttons / ExcitationType enum).
-    const int index = excitationParam != nullptr
-                        ? juce::roundToInt (excitationParam->load())
-                        : 0;
-    int family = 0;                      // 0..2  -> IMPACT
-    if      (index >= 11) family = 5;    // 11..12 -> TAPE
-    else if (index >= 10) family = 4;    // 10     -> NOISE
-    else if (index >= 7)  family = 3;    // 7..9   -> SYNTH
-    else if (index >= 5)  family = 2;    // 5..6   -> AIR
-    else if (index >= 3)  family = 1;    // 3..4   -> FRICTION
-
-    juce::Path path;
-    constexpr int points = 110;
-    for (int i = 0; i <= points; ++i)
-    {
-        const float x  = (float) i / (float) points;
-        const float v  = waveSample (family, x, phase);
-        const float px = area.getX() + x * area.getWidth();
-        const float py = area.getCentreY() - v * area.getHeight() * 0.42f;
-
-        if (i == 0) path.startNewSubPath (px, py);
-        else        path.lineTo (px, py);
-    }
-
     const juce::Colour trace { 0xff00f0ff };
     const float lineW = juce::jmax (1.5f, getHeight() * 0.03f);
-    g.setColour (trace.withAlpha (0.22f));
-    g.strokePath (path, juce::PathStrokeType (lineW * 2.4f, juce::PathStrokeType::curved));
-    g.setColour (trace);
-    g.strokePath (path, juce::PathStrokeType (lineW, juce::PathStrokeType::curved));
+
+    // Try to read real audio from the processor's scope buffer.
+    bool drewReal = false;
+    if (processor != nullptr)
+    {
+        // Copy the ring buffer into a local snapshot (lock-free read).
+        constexpr int N = MorphiumAudioProcessor::scopeBufferSize;
+        std::array<float, N> snapshot;
+        const int writePos = processor->scopeWritePos.load (std::memory_order_acquire);
+        for (int i = 0; i < N; ++i)
+            snapshot[(size_t) i] = processor->scopeBuffer[(size_t) ((writePos + i) % N)];
+
+        // Check if there is enough signal to show.
+        float rms = 0.0f;
+        for (float s : snapshot)
+            rms += s * s;
+        rms = std::sqrt (rms / (float) N);
+
+        if (rms > 0.003f)
+        {
+            drewReal = true;
+
+            // Find peak for auto-scaling.
+            float peak = 0.0f;
+            for (float s : snapshot)
+                peak = juce::jmax (peak, std::abs (s));
+            const float scale = (peak > 0.001f) ? (0.42f / peak) : 0.42f;
+
+            juce::Path path;
+            for (int i = 0; i < N; ++i)
+            {
+                const float x = area.getX() + ((float) i / (float) (N - 1)) * area.getWidth();
+                const float y = area.getCentreY() - snapshot[(size_t) i] * area.getHeight() * scale;
+                if (i == 0) path.startNewSubPath (x, y);
+                else        path.lineTo (x, y);
+            }
+
+            g.setColour (trace.withAlpha (0.22f));
+            g.strokePath (path, juce::PathStrokeType (lineW * 2.4f, juce::PathStrokeType::curved));
+            g.setColour (trace);
+            g.strokePath (path, juce::PathStrokeType (lineW, juce::PathStrokeType::curved));
+        }
+    }
+
+    // Fallback: procedural waveform when idle (no audio playing).
+    if (! drewReal)
+    {
+        const int index = excitationParam != nullptr
+                            ? juce::roundToInt (excitationParam->load())
+                            : 0;
+        const int family = MorphiumAudioProcessorEditor::excitationFamily (index);
+
+        juce::Path path;
+        constexpr int points = 110;
+        for (int i = 0; i <= points; ++i)
+        {
+            const float x  = (float) i / (float) points;
+            const float v  = waveSample (family, x, phase);
+            const float px = area.getX() + x * area.getWidth();
+            const float py = area.getCentreY() - v * area.getHeight() * 0.42f;
+
+            if (i == 0) path.startNewSubPath (px, py);
+            else        path.lineTo (px, py);
+        }
+
+        g.setColour (trace.withAlpha (0.22f));
+        g.strokePath (path, juce::PathStrokeType (lineW * 2.4f, juce::PathStrokeType::curved));
+        g.setColour (trace);
+        g.strokePath (path, juce::PathStrokeType (lineW, juce::PathStrokeType::curved));
+    }
 }
 
 void MacroKnob::paint (juce::Graphics& g)
@@ -208,8 +299,6 @@ void MacroKnob::paint (juce::Graphics& g)
     const float angle = start + v * (end - start);
 
     const auto gold    = MorphiumLookAndFeel::gold;
-    const auto metalLt = MorphiumLookAndFeel::metalLight;
-    const auto metalDk = MorphiumLookAndFeel::metalDark;
     const float ringR  = radius * 0.93f;
 
     // Track ring (full sweep).
@@ -229,26 +318,12 @@ void MacroKnob::paint (juce::Graphics& g)
     g.strokePath (arc, juce::PathStrokeType (radius * 0.11f, juce::PathStrokeType::curved,
                                              juce::PathStrokeType::rounded));
 
-    // Knob body with shadow + metal gradient.
+    // Knob body + pointer use the shared realistic renderer so the hero knob
+    // matches every other knob's lighting exactly.
     const float bodyR = radius * 0.64f;
     const auto body = juce::Rectangle<float> (bodyR * 2.0f, bodyR * 2.0f).withCentre (centre);
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
-    g.fillEllipse (body.translated (0.0f, radius * 0.04f).expanded (radius * 0.03f));
-    g.setGradientFill ({ metalLt, body.getCentreX(), body.getY(),
-                         metalDk, body.getCentreX(), body.getBottom(), false });
-    g.fillEllipse (body);
-    g.setColour (MorphiumLookAndFeel::slotDark);
-    g.drawEllipse (body, 2.5f);
-    g.setColour (juce::Colours::white.withAlpha (0.06f));
-    g.drawEllipse (body.reduced (bodyR * 0.16f), 1.5f);
-
-    // Pointer.
-    const juce::Point<float> tip  { centre.x + bodyR * 0.80f * std::sin (angle),
-                                    centre.y - bodyR * 0.80f * std::cos (angle) };
-    const juce::Point<float> base { centre.x + bodyR * 0.16f * std::sin (angle),
-                                    centre.y - bodyR * 0.16f * std::cos (angle) };
-    g.setColour (MorphiumLookAndFeel::pointer);
-    g.drawLine ({ base, tip }, juce::jmax (2.5f, radius * 0.085f));
+    MorphiumLookAndFeel::drawKnobBody (g, body, gold);
+    MorphiumLookAndFeel::drawKnobPointer (g, body, angle, MorphiumLookAndFeel::pointer);
 
     // A / B / C markers, set outside the value ring so they never sit on it.
     const float labelR = half * 0.87f;
@@ -300,8 +375,11 @@ void PresetDisplay::mouseDown (const juce::MouseEvent& e)
 void PresetDisplay::paint (juce::Graphics& g)
 {
     const float h = (float) getHeight();
-    const float w = (float) getWidth();
-    const float sidePad = juce::jmin (30.0f, w * 0.12f);
+    // The chevron box must scale with the (height-driven) glyph, otherwise the
+    // arrows get clipped to nothing as the editor is resized larger. Pad the
+    // text in past the chevrons so they never collide.
+    const float arrowW  = juce::jmax (24.0f, h * 0.5f);
+    const float sidePad = arrowW + h * 0.10f;
     auto bounds = getLocalBounds().toFloat().reduced (sidePad, h * 0.14f);
     const auto cyan = MorphiumLookAndFeel::ledCyan;
 
@@ -334,31 +412,49 @@ void PresetDisplay::paint (juce::Graphics& g)
     g.setColour (cyan.withAlpha (over ? 0.85f : 0.35f));
     g.setFont (juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(),
                                               h * 0.36f, juce::Font::bold)));
-    const float arrowBox = juce::jmin (24.0f, w * 0.08f);
-    g.drawText ("<", full.removeFromLeft (arrowBox),  juce::Justification::centred, false);
-    g.drawText (">", full.removeFromRight (arrowBox), juce::Justification::centred, false);
+    g.drawText ("<", full.removeFromLeft (arrowW),  juce::Justification::centred, false);
+    g.drawText (">", full.removeFromRight (arrowW), juce::Justification::centred, false);
 }
 
-void SourceButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down*/)
+void SourceButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 {
     const auto bounds = getLocalBounds().toFloat();
+    const auto cap = bounds.reduced (1.5f);
+    constexpr float corner = 6.0f;
+
+    // Cap relief: domed when up, inset (darker, top inner shadow) when pressed.
+    if (down)
+    {
+        g.setColour (juce::Colours::black.withAlpha (0.28f));
+        g.fillRoundedRectangle (cap, corner);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.drawLine (cap.getX() + 4.0f, cap.getY() + 1.5f,
+                    cap.getRight() - 4.0f, cap.getY() + 1.5f, 1.5f);   // inner shadow
+    }
+    else
+    {
+        MorphiumLookAndFeel::drawConvexRect (g, cap, corner,
+                                             juce::Colours::white.withAlpha (highlighted ? 0.14f : 0.08f),
+                                             juce::Colours::black.withAlpha (0.18f));
+        g.setColour (juce::Colours::white.withAlpha (0.16f));
+        g.drawLine (cap.getX() + 4.0f, cap.getY() + 1.5f,
+                    cap.getRight() - 4.0f, cap.getY() + 1.5f, 1.0f);   // top highlight
+    }
 
     if (selected)
     {
         g.setColour (MorphiumLookAndFeel::gold.withAlpha (0.95f));
-        g.drawRoundedRectangle (bounds.reduced (1.5f), 6.0f, 2.0f);
+        g.drawRoundedRectangle (cap, corner, 2.0f);
     }
-    else if (highlighted)
-    {
-        g.setColour (juce::Colours::white.withAlpha (0.07f));
-        g.fillRoundedRectangle (bounds, 6.0f);
-    }
+
+    // Pressing visually sinks the LED + label by one pixel.
+    const float sink = down ? 1.0f : 0.0f;
 
     // LED, positioned top-center for perfect symmetry
     const float ledSize = bounds.getHeight() * 0.16f;
     const auto led = juce::Rectangle<float> (ledSize, ledSize)
                          .withCentre ({ bounds.getCentreX(),
-                                        bounds.getY() + 8.0f });
+                                        bounds.getY() + 8.0f + sink });
     if (selected)
     {
         g.setColour (MorphiumLookAndFeel::ledCyan.withAlpha (0.35f));
@@ -370,33 +466,56 @@ void SourceButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down
         g.setColour (juce::Colour { 0xff3a2222 });
     }
     g.fillEllipse (led);
+    if (selected)   // tiny specular dot on the lit LED
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.7f));
+        g.fillEllipse (led.reduced (ledSize * 0.32f).translated (-ledSize * 0.1f, -ledSize * 0.1f));
+    }
 
     // Draw text perfectly centered but shifted down slightly to accommodate the LED
     g.setColour (juce::Colour { 0xff00f0ff }); // cyan
     g.setFont (juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(),
                                               bounds.getHeight() * 0.28f, juce::Font::bold)));
-    g.drawText (getButtonText(), bounds.withTrimmedTop(8.0f), juce::Justification::centred, false);
+    g.drawText (getButtonText(), bounds.withTrimmedTop (8.0f + sink), juce::Justification::centred, false);
 }
 
-void ResonatorButton::paintButton (juce::Graphics& g, bool highlighted, bool /*down*/)
+void ResonatorButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 {
-    const auto bounds = getLocalBounds().toFloat();
+    const auto cap = getLocalBounds().toFloat().reduced (1.0f);
+    constexpr float corner = 4.0f;
+
+    // Relief: a faint raised cap normally, inset + darkened when pressed.
+    if (down)
+    {
+        g.setColour (juce::Colours::black.withAlpha (0.30f));
+        g.fillRoundedRectangle (cap, corner);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.drawLine (cap.getX() + 3.0f, cap.getY() + 1.2f,
+                    cap.getRight() - 3.0f, cap.getY() + 1.2f, 1.2f);
+    }
+    else
+    {
+        MorphiumLookAndFeel::drawConvexRect (g, cap, corner,
+                                             juce::Colours::white.withAlpha (0.07f),
+                                             juce::Colours::black.withAlpha (0.16f));
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.drawLine (cap.getX() + 3.0f, cap.getY() + 1.2f,
+                    cap.getRight() - 3.0f, cap.getY() + 1.2f, 1.0f);
+    }
 
     if (selected)
     {
-        // Glowing Neon pink border matching selection slot
+        // Subtle pink fill background + glowing Neon pink border.
+        g.setColour (MorphiumLookAndFeel::gold.withAlpha (0.12f));
+        g.fillRoundedRectangle (cap, corner);
         g.setColour (MorphiumLookAndFeel::gold);
-        g.drawRoundedRectangle (bounds.reduced (1.0f), 4.0f, 1.8f);
-        
-        // Subtle pink fill background
-        g.setColour (MorphiumLookAndFeel::gold.withAlpha (0.10f));
-        g.fillRoundedRectangle (bounds.reduced (1.0f), 4.0f);
+        g.drawRoundedRectangle (cap, corner, 1.8f);
     }
     else if (highlighted)
     {
         // Cyber cyan hover feedback border
         g.setColour (MorphiumLookAndFeel::pointer.withAlpha (0.5f));
-        g.drawRoundedRectangle (bounds.reduced (1.0f), 4.0f, 1.2f);
+        g.drawRoundedRectangle (cap, corner, 1.2f);
     }
 }
 
@@ -406,8 +525,12 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     setLookAndFeel (&lookAndFeel);
     setWantsKeyboardFocus (true);   // so Esc reaches keyPressed() for panic
 
-    panel = juce::Drawable::createFromImageData (BinaryData::morphium_panel_svg,
-                                                 BinaryData::morphium_panel_svgSize);
+    juce::String svgText (BinaryData::morphium_panel_svg, BinaryData::morphium_panel_svgSize);
+    svgText = svgText.replace ("BUILD_VERSION_PLACEHOLDER", "v" + juce::String (MORPHIUM_VERSION));
+ 
+    std::unique_ptr<juce::XmlElement> xml (juce::XmlDocument::parse (svgText));
+    if (xml != nullptr)
+        panel = juce::Drawable::createFromSVG (*xml);
 
     // --- Preset display -----------------------------------------------------
     presetDisplay.onStep = [this] (int direction) { stepPreset (direction); };
@@ -419,6 +542,7 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
 
     // --- Waveform scope -----------------------------------------------------
     waveDisplay.setSource (apvts.getRawParameterValue (params::excitationType));
+    waveDisplay.setProcessor (&processorRef);
     addAndMakeVisible (waveDisplay);
 
     // WAVE knob over the scope: scans the wavetable morph frames (added after the
@@ -464,13 +588,7 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
             [this] (float value)
             {
                 const int index = juce::roundToInt (value);
-                int category = 0;
-                if (index >= 11) category = 5;
-                else if (index >= 10) category = 4;
-                else if (index >= 7) category = 3;
-                else if (index >= 5) category = 2;
-                else if (index >= 3) category = 1;
-                else category = 0;
+                const int category = excitationFamily (index);
 
                 for (int i = 0; i < numSources; ++i)
                     sourceButtons[(size_t) i].setSelectedState (i == category);
@@ -494,10 +612,22 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     frictionAtt = std::make_unique<SliderAttachment> (apvts, params::friction, frictionSlider);
     wearAtt     = std::make_unique<SliderAttachment> (apvts, params::wear,     wearSlider);
 
+    densitySlider.setTooltip  ("DENSITY - low-end body + modal inharmonicity");
+    massSlider.setTooltip     ("MASS - darkness + spectral tilt");
+    frictionSlider.setTooltip ("FRICTION - exciter saturation + body nonlinearity");
+    wearSlider.setTooltip     ("WEAR - material ageing, T60 loss, detune");
+
+    // Matter faders: warm amber accent to distinguish from CORE's pink.
+    const juce::Colour matterAccent { 0xffff6b00 };
+    for (auto* s : { &densitySlider, &massSlider, &frictionSlider, &wearSlider })
+        s->setColour (MorphiumLookAndFeel::accentColourId, matterAccent);
+
     // --- Resonator buttons --------------------------------------------------
+    const char* resonatorNames[] = { "OFF", "METAL", "GLASS", "WOOD", "TAPE", "CIRCUIT", "CONCRETE" };
     for (int i = 0; i < numResonatorModes; ++i)
     {
         auto& button = resonatorButtons[(size_t) i];
+        button.setButtonText (resonatorNames[i]);
         button.onClick = [this, i]
         {
             if (resonatorAttachment != nullptr)
@@ -512,8 +642,6 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
             *resonatorParam,
             [this] (float value)
             {
-                // Materials beyond the four panel slots (TAPE/CIRCUIT/CONCRETE,
-                // reachable via presets or host automation) light no button.
                 const int index = juce::roundToInt (value);
                 for (int i = 0; i < numResonatorModes; ++i)
                     resonatorButtons[(size_t) i].setSelectedState (i == index);
@@ -539,6 +667,25 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
     driveAtt       = std::make_unique<SliderAttachment> (apvts, params::drive,       driveSlider);
     outputAtt      = std::make_unique<SliderAttachment> (apvts, params::outputGain, outputSlider);
 
+    attackSlider.setTooltip      ("ATTACK - onset time (s)");
+    decaySlider.setTooltip       ("DECAY - decay time (s)");
+    sustainSlider.setTooltip     ("SUSTAIN - hold level");
+    releaseSlider.setTooltip     ("RELEASE - tail time (s)");
+    lfoRateSlider.setTooltip     ("LFO RATE - modulation speed (Hz)");
+    lfoDepthSlider.setTooltip    ("LFO DEPTH - modulation intensity");
+    reverbSizeSlider.setTooltip  ("REVERB SIZE - room scale");
+    reverbMixSlider.setTooltip   ("REVERB MIX - wet/dry blend");
+    driveSlider.setTooltip       ("DRIVE - soft-clipping saturation");
+    outputSlider.setTooltip      ("OUTPUT - master gain (dB)");
+
+    // Motion/Space knobs: cyan accent to tie them to the scope/LED aesthetic.
+    for (auto* s : { &lfoRateSlider, &lfoDepthSlider, &reverbSizeSlider,
+                     &reverbMixSlider, &driveSlider, &outputSlider })
+        s->setColour (MorphiumLookAndFeel::accentColourId, MorphiumLookAndFeel::pointer);
+
+    // --- Output level meter --------------------------------------------------
+    addAndMakeVisible (outputMeter);
+
     // --- Borato Macro -------------------------------------------------------
     addAndMakeVisible (macroDisplay);
     macroDisplay.onStep = [this] (int direction) {
@@ -554,17 +701,20 @@ MorphiumAudioProcessorEditor::MorphiumAudioProcessorEditor (MorphiumAudioProcess
             int index = juce::roundToInt(value);
             auto choices = dynamic_cast<juce::AudioParameterChoice*>(processorRef.getValueTreeState().getParameter(params::macroMode))->choices;
             macroDisplay.setContent(-1, "MODE: " + choices[index]);
+            updateMacroHighlight (index);
             applyMacro (macroSlider.getValue(), index);
         });
         macroModeAtt->sendInitialUpdate();
     }
 
     configureRotary (macroSlider);
+    macroSlider.setTooltip ("BORATO MACRO - morph engine (A/B/C matter states)");
     macroAtt = std::make_unique<SliderAttachment> (apvts, params::macroAmount, macroSlider);
     macroSlider.onValueChange = [this]
     {
         if (auto* choiceParam = dynamic_cast<juce::AudioParameterChoice*>(processorRef.getValueTreeState().getParameter(params::macroMode))) {
             applyMacro (macroSlider.getValue(), choiceParam->getIndex());
+            macroHighlightFrames = macroHighlightDuration;
         }
     };
 
@@ -595,6 +745,17 @@ void MorphiumAudioProcessorEditor::timerCallback()
     if (wavePhase >= 1.0f)
         wavePhase -= 1.0f;
     waveDisplay.setPhase (wavePhase);
+
+    // Feed the output meter with the latest peak levels from the processor.
+    outputMeter.setLevels (processorRef.peakLeft.load (std::memory_order_relaxed),
+                           processorRef.peakRight.load (std::memory_order_relaxed));
+
+    // Decay the macro highlight.
+    if (macroHighlightFrames > 0)
+    {
+        --macroHighlightFrames;
+        repaint();
+    }
 
     refreshPresetDisplay();
 }
@@ -632,12 +793,21 @@ void MorphiumAudioProcessorEditor::showPresetMenu()
     
     menu.addSeparator();
     
-    // User presets
+    // User presets — each in its own submenu with Load / Rename / Delete.
     juce::PopupMenu userMenu;
     auto userPresets = processorRef.presetManager.getUserPresets();
     for (int i = 0; i < userPresets.size(); ++i)
     {
-        userMenu.addItem(1000 + i, userPresets[i], true, processorRef.presetManager.currentUserPresetName == userPresets[i]);
+        const juce::String presetName = userPresets[i];
+        const bool isActive = processorRef.presetManager.currentUserPresetName == presetName;
+
+        juce::PopupMenu subMenu;
+        subMenu.addItem (1000 + i, "Load", true, isActive);
+        subMenu.addSeparator();
+        subMenu.addItem (3000 + i, "Rename...");
+        subMenu.addItem (4000 + i, "Delete", true, true);
+
+        userMenu.addSubMenu (presetName, subMenu, true);
     }
     menu.addSubMenu("User Presets", userMenu);
     
@@ -681,6 +851,49 @@ void MorphiumAudioProcessorEditor::showPresetMenu()
                     delete aw;
                 }));
         }
+        else if (result >= 3000 && result < 4000)
+        {
+            // Rename user preset.
+            const juce::String oldName = userPresets[result - 3000];
+            auto* aw = new juce::AlertWindow("Rename Preset", "Enter a new name:", juce::MessageBoxIconType::NoIcon);
+            aw->addTextEditor("presetName", oldName, "");
+            aw->addButton("Rename", 1, juce::KeyPress(juce::KeyPress::returnKey, 0, 0));
+            aw->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey, 0, 0));
+
+            aw->enterModalState(true, juce::ModalCallbackFunction::create(
+                [this, aw, oldName] (int r)
+                {
+                    if (r == 1)
+                    {
+                        juce::String newName = aw->getTextEditorContents("presetName");
+                        if (newName.isNotEmpty() && newName != oldName)
+                        {
+                            processorRef.presetManager.renameUserPreset (oldName, newName);
+                            refreshPresetDisplay();
+                        }
+                    }
+                    delete aw;
+                }));
+        }
+        else if (result >= 4000 && result < 5000)
+        {
+            // Delete user preset (with confirmation).
+            const juce::String name = userPresets[result - 4000];
+            juce::NativeMessageBox::showYesNoBox (
+                juce::MessageBoxIconType::WarningIcon,
+                "Delete Preset",
+                "Delete preset \"" + name + "\"?",
+                nullptr,
+                juce::ModalCallbackFunction::create (
+                    [this, name] (int r)
+                    {
+                        if (r == 1)
+                        {
+                            processorRef.presetManager.deleteUserPreset (name);
+                            refreshPresetDisplay();
+                        }
+                    }));
+        }
     });
 }
 
@@ -702,11 +915,14 @@ void WaveKnob::paint (juce::Graphics& g)
 
     const juce::Colour cyan { 0xff00f0ff };
 
-    // Recessed dark disc so the cyan reads cleanly over the CRT trace.
-    g.setColour (juce::Colour { 0xcc0d011c });
-    g.fillEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f);
+    // Recessed dark disc so the cyan reads cleanly over the CRT trace, lightly
+    // domed with a faint specular so it gains a touch of volume.
+    const auto disc = juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre ({ cx, cy });
+    MorphiumLookAndFeel::drawConvexDisc (g, disc,
+                                         juce::Colour { 0xcc1a0a30 }, juce::Colour { 0xdd0d011c });
     g.setColour (cyan.withAlpha (0.45f));
-    g.drawEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f, 1.0f);
+    g.drawEllipse (disc, 1.0f);
+    MorphiumLookAndFeel::drawSpecular (g, disc, 0.18f);
 
     const auto  rp   = getRotaryParameters();
     const float prop = (float) valueToProportionOfLength (getValue());
@@ -726,6 +942,90 @@ void WaveKnob::paint (juce::Graphics& g)
     g.setColour (cyan);
     g.drawLine (cx, cy, px, py, 1.6f);
     g.fillEllipse (px - 1.8f, py - 1.8f, 3.6f, 3.6f);
+}
+
+// --- LevelMeter -------------------------------------------------------------
+
+LevelMeter::LevelMeter()
+{
+    startTimerHz (30);
+}
+
+void LevelMeter::setLevels (float left, float right)
+{
+    currentLeft  = left;
+    currentRight = right;
+}
+
+void LevelMeter::timerCallback()
+{
+    // Decay the displayed levels smoothly.
+    constexpr float decay = 0.85f;
+    peakHoldLeft  = juce::jmax (currentLeft,  peakHoldLeft  * decay);
+    peakHoldRight = juce::jmax (currentRight, peakHoldRight * decay);
+
+    // Peak hold: hold the peak for a few frames, then decay.
+    if (currentLeft >= peakHoldLeft * 0.99f)
+    {
+        peakHoldLeft = currentLeft;
+        peakHoldCounterLeft = peakHoldFrames;
+    }
+    else if (--peakHoldCounterLeft <= 0)
+    {
+        peakHoldLeft *= decay;
+    }
+
+    if (currentRight >= peakHoldRight * 0.99f)
+    {
+        peakHoldRight = currentRight;
+        peakHoldCounterRight = peakHoldFrames;
+    }
+    else if (--peakHoldCounterRight <= 0)
+    {
+        peakHoldRight *= decay;
+    }
+
+    repaint();
+}
+
+void LevelMeter::paint (juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+    const float gap = 2.0f;
+    const float barW = (bounds.getWidth() - gap) * 0.5f;
+
+    auto drawBar = [&] (float x, float level, float peak)
+    {
+        auto bar = juce::Rectangle<float> (x, bounds.getY(), barW, bounds.getHeight());
+
+        // Background track.
+        g.setColour (juce::Colour { 0xff0d011c });
+        g.fillRoundedRectangle (bar, 2.0f);
+
+        // Level fill (green -> yellow -> red).
+        const float h = bar.getHeight() * juce::jlimit (0.0f, 1.0f, level);
+        if (h > 0.0f)
+        {
+            auto fill = bar.removeFromBottom (h);
+            const juce::Colour green  { 0xff00f0ff };
+            const juce::Colour yellow { 0xffffff00 };
+            const juce::Colour red    { 0xffff007f };
+
+            juce::Colour c = (level > 0.85f) ? red
+                           : (level > 0.6f)  ? yellow.withAlpha (0.9f)
+                           :                   green;
+            g.setColour (c);
+            g.fillRoundedRectangle (fill, 2.0f);
+        }
+
+        // Peak hold line.
+        const float peakY = bar.getBottom() - bar.getHeight() * juce::jlimit (0.0f, 1.0f, peak);
+        g.setColour (juce::Colours::white.withAlpha (0.8f));
+        g.drawLine (bar.getX(), peakY, bar.getRight(), peakY, 1.5f);
+    };
+
+    drawBar (bounds.getX(), currentLeft, peakHoldLeft);
+    drawBar (bounds.getX() + barW + gap, currentRight, peakHoldRight);
 }
 
 void MorphiumAudioProcessorEditor::configureRotary (juce::Slider& s)
@@ -768,6 +1068,28 @@ void MorphiumAudioProcessorEditor::paint (juce::Graphics& g)
                            juce::RectanglePlacement::stretchToFit, 1.0f);
 }
 
+void MorphiumAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
+{
+    if (macroHighlightFrames <= 0 || macroAffectedSliders.empty())
+        return;
+
+    const float alpha = (float) macroHighlightFrames / (float) macroHighlightDuration;
+    const auto accent = MorphiumLookAndFeel::gold.withAlpha (alpha * 0.6f);
+
+    for (auto* slider : macroAffectedSliders)
+    {
+        if (slider == nullptr || ! slider->isVisible())
+            continue;
+
+        auto bounds = slider->getBounds().toFloat().reduced (2.0f);
+        g.setColour (accent);
+        if (slider->getSliderStyle() == juce::Slider::LinearVertical)
+            g.drawRoundedRectangle (bounds, 4.0f, 2.5f);
+        else
+            g.drawEllipse (bounds, 2.5f);
+    }
+}
+
 void MorphiumAudioProcessorEditor::resized()
 {
     // Coordinates below are taken directly from the SVG panel zones.
@@ -794,21 +1116,27 @@ void MorphiumAudioProcessorEditor::resized()
     // LED under the source buttons. SVG: transform="translate(885 311)" size 254x26
     excitationDisplay.setBounds (svg (885, 311, 254, 26));
 
-    // MATTER faders -> Y=458, Height=134 matches SVG slot inner track
-    densitySlider.setBounds  (svg (412, 458, 34, 134));
-    massSlider.setBounds     (svg (476, 458, 34, 134));
-    frictionSlider.setBounds (svg (540, 458, 34, 134));
-    wearSlider.setBounds     (svg (604, 458, 34, 134));
+    // MATTER faders -> Y=468, Height=124 (shifted down 10px, tracks shortened)
+    densitySlider.setBounds  (svg (412, 468, 34, 124));
+    massSlider.setBounds     (svg (476, 468, 34, 124));
+    frictionSlider.setBounds (svg (540, 468, 34, 124));
+    wearSlider.setBounds     (svg (604, 468, 34, 124));
 
     // MACRO
     // BORATO MACRO: the hero control. Centred at (792, 530)
     macroSlider.setBounds  (svg (702, 440, 180, 180));
     macroDisplay.setBounds (svg (732, 635, 120, 22));
 
-    // RESONATOR Model buttons: positioned exactly above faders.
+    // RESONATOR Model buttons: two rows above faders, matching SVG slots.
+    // Row 1 (i<4): OFF, METAL, GLASS, WOOD at y=430, h=14
+    // Row 2 (i>=4): TAPE, CIRCUIT, CONCRETE at y=446, h=12
     for (int i = 0; i < numResonatorModes; ++i)
     {
-        resonatorButtons[(size_t) i].setBounds (svg (403.0f + (float) i * 64.0f, 430.0f, 52.0f, 20.0f));
+        const int col = i % 4;
+        const int row = i / 4;
+        const int yy = 430 + row * 16;
+        const int hh = 14 - row * 2;
+        resonatorButtons[(size_t) i].setBounds (svg (403.0f + (float) col * 64.0f, (float) yy, 52.0f, (float) hh));
     }
 
     // CORE knobs -> A / D / S / R (2x2 grid)
@@ -826,6 +1154,9 @@ void MorphiumAudioProcessorEditor::resized()
     lfoDepthSlider.setBounds   (svg (910, 565, 60, 60));
     reverbMixSlider.setBounds  (svg (990, 565, 60, 60));
     outputSlider.setBounds     (svg (1070, 565, 60, 60));
+
+    // Output level meter: thin bar right next to the output knob.
+    outputMeter.setBounds      (svg (1132, 565, 10, 60));
 
 }
 }

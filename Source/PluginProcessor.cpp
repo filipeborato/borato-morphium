@@ -178,6 +178,40 @@ void MorphiumAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
                           data[i]);
         }
     }
+
+    // Feed the scope ring buffer with the latest output (left channel).
+    {
+        const float* data = buffer.getReadPointer (0);
+        const int numSamples = buffer.getNumSamples();
+        int pos = scopeWritePos.load (std::memory_order_relaxed);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            scopeBuffer[(size_t) pos] = data[i];
+            pos = (pos + 1) % scopeBufferSize;
+        }
+        scopeWritePos.store (pos, std::memory_order_release);
+    }
+
+    // Update peak levels for the output meter.
+    {
+        float pL = 0.0f, pR = 0.0f;
+        const int numSamples = buffer.getNumSamples();
+        const float* left = buffer.getReadPointer (0);
+        for (int i = 0; i < numSamples; ++i)
+            pL = juce::jmax (pL, std::abs (left[i]));
+        if (buffer.getNumChannels() > 1)
+        {
+            const float* right = buffer.getReadPointer (1);
+            for (int i = 0; i < numSamples; ++i)
+                pR = juce::jmax (pR, std::abs (right[i]));
+        }
+        else
+        {
+            pR = pL;
+        }
+        peakLeft.store (pL, std::memory_order_relaxed);
+        peakRight.store (pR, std::memory_order_relaxed);
+    }
 }
 
 juce::AudioProcessorEditor* MorphiumAudioProcessor::createEditor()

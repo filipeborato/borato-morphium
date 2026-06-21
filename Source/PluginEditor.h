@@ -73,19 +73,22 @@ namespace morphium
     };
 
     /**
-        A small animated oscilloscope. It draws a stylised waveform that is
-        characteristic of the currently selected excitation source, scrolling
-        gently so it reads as "alive" rather than a static picture.
+        A small animated oscilloscope. When audio is playing it shows the real
+        output waveform from a lock-free ring buffer in the processor. When
+        idle it falls back to a stylised procedural waveform per excitation
+        family, scrolling gently so it reads as "alive".
     */
     class WaveDisplay : public juce::Component
     {
     public:
         void setSource (std::atomic<float>* parameter) { excitationParam = parameter; }
+        void setProcessor (MorphiumAudioProcessor* p) { processor = p; }
         void setPhase (float newPhase) { phase = newPhase; repaint(); }
         void paint (juce::Graphics&) override;
 
     private:
         std::atomic<float>* excitationParam = nullptr;
+        MorphiumAudioProcessor* processor = nullptr;
         float phase = 0.0f;
     };
 
@@ -115,6 +118,25 @@ namespace morphium
         void paint (juce::Graphics&) override;
     };
 
+    /**
+        A stereo peak level meter. Two thin vertical bars with decay,
+        positioned next to the output knob.
+    */
+    class LevelMeter : public juce::Component, private juce::Timer
+    {
+    public:
+        LevelMeter();
+        void setLevels (float left, float right);
+        void paint (juce::Graphics&) override;
+
+    private:
+        void timerCallback() override;
+        float currentLeft = 0.0f, currentRight = 0.0f;
+        float peakHoldLeft = 0.0f, peakHoldRight = 0.0f;
+        int peakHoldCounterLeft = 0, peakHoldCounterRight = 0;
+        static constexpr int peakHoldFrames = 20; // ~667ms at 30Hz
+    };
+
     class MorphiumAudioProcessorEditor : public juce::AudioProcessorEditor,
                                          private juce::Timer
     {
@@ -123,12 +145,17 @@ namespace morphium
         ~MorphiumAudioProcessorEditor() override;
 
         void paint (juce::Graphics&) override;
+        void paintOverChildren (juce::Graphics&) override;
         void resized() override;
 
         // Panic affordances: Esc (or double-clicking the chassis) hard-stops
         // every voice — a safety net for notes left stuck by a lost note-off.
         bool keyPressed (const juce::KeyPress&) override;
         void mouseDoubleClick (const juce::MouseEvent&) override;
+
+        /** Maps an excitation type index (0..17) to its SOURCE family (0..5):
+            0 IMPACT · 1 FRICTION · 2 AIR · 3 SYNTH · 4 NOISE · 5 TAPE. */
+        static int excitationFamily (int index) noexcept;
 
     private:
         using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
@@ -144,6 +171,7 @@ namespace morphium
         void refreshPresetDisplay();
         void showPresetMenu();
         void applyMacro (float amount, int mode);
+        void updateMacroHighlight (int mode);
 
         MorphiumAudioProcessor& processorRef;
         MorphiumLookAndFeel lookAndFeel;
@@ -160,7 +188,7 @@ namespace morphium
         std::array<SourceButton, numSources> sourceButtons;
         std::unique_ptr<juce::ParameterAttachment> excitationAttachment;
 
-        static constexpr int numResonatorModes = 4;
+        static constexpr int numResonatorModes = 7;
         std::array<ResonatorButton, numResonatorModes> resonatorButtons;
         std::unique_ptr<juce::ParameterAttachment> resonatorAttachment;
 
@@ -178,6 +206,7 @@ namespace morphium
         
         juce::Slider outputSlider;
         MacroKnob    macroSlider;                // "Borato Macro": morph engine
+        LevelMeter   outputMeter;
 
         std::unique_ptr<SliderAttachment> densityAtt, massAtt, frictionAtt, wearAtt;
         std::unique_ptr<SliderAttachment> attackAtt, decayAtt, sustainAtt, releaseAtt;
@@ -188,6 +217,12 @@ namespace morphium
         
         std::unique_ptr<SliderAttachment> macroAtt;
         std::unique_ptr<juce::ParameterAttachment> macroModeAtt;
+
+        // Macro highlight: sliders affected by the current macro mode glow
+        // briefly when the macro knob is moved.
+        std::vector<juce::Slider*> macroAffectedSliders;
+        int macroHighlightFrames = 0;
+        static constexpr int macroHighlightDuration = 15; // ~500ms at 30Hz
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MorphiumAudioProcessorEditor)
     };

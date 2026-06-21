@@ -19,6 +19,7 @@ namespace morphium
         
         juce::StringArray getUserPresets() const;
         void deleteUserPreset(const juce::String& name);
+        void renameUserPreset(const juce::String& oldName, const juce::String& newName);
 
         int currentFactoryIndex = 0;
         juce::String currentUserPresetName;
